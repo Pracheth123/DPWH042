@@ -1,0 +1,2 @@
+# NLP-processed output artifacts (embeddings, tagged CSVs, etc.).
+# Files in this directory are git-ignored — do not commit processed data.
