@@ -28,7 +28,7 @@ _CONTROL_CHAR_RE = re.compile(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\x9F]")
 
 
 def _sanitize(text: str) -> str:
-    """Strip null bytes and non-printable control characters from raw_text.
+    """Strip null bytes and non-printable control characters from text.
     Keeps \\t and \\n so that multiline forum posts remain readable.
     """
     return _CONTROL_CHAR_RE.sub("", text)
@@ -36,14 +36,14 @@ def _sanitize(text: str) -> str:
 
 def process_and_store(payload: SignalIngest) -> SignalRecord:
     """
-    Sanitize, run the NLP pipeline on `payload.raw_text`, persist the enriched
+    Sanitize, run the NLP pipeline on `payload.text`, persist the enriched
     record, and return a validated SignalRecord.
 
     This function is the single integration point between the API layer and
     the NLP + DB layers.  Keeping it thin and explicit makes it easy to test.
     """
-    # 1. Sanitize raw_text — strip null bytes and control characters
-    clean_text = _sanitize(payload.raw_text)
+    # 1. Sanitize text — strip null bytes and control characters
+    clean_text = _sanitize(payload.text)
 
     # 2. Detect language
     language = nlp_service.detect_language(clean_text)
@@ -55,12 +55,12 @@ def process_and_store(payload: SignalIngest) -> SignalRecord:
     severity = nlp_service.derive_severity(confidence)
 
     # 5. Build the record dict (payload fields + NLP outputs)
-    #    Overwrite raw_text with clean_text so the sanitized version is stored.
+    #    Overwrite text with clean_text so the sanitized version is stored.
     record_dict = {
         **payload.model_dump(),
         # Ensure SourceType enum is serialised to its string value for storage
-        "source_type": payload.source_type.value,
-        "raw_text": clean_text,
+        "source": payload.source.value,
+        "text": clean_text,
         "language": language.value,
         "signal_type": signal_type.value,
         "confidence": confidence,

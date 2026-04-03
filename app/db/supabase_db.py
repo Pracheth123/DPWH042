@@ -95,12 +95,12 @@ def get_signal_by_id(signal_id: str) -> Optional[dict]:
     return response.data[0] if response.data else None
 
 
-def get_signals_by_source(source_type: SourceType) -> list[dict]:
+def get_signals_by_source(source: SourceType) -> list[dict]:
     """Return all rows for a specific source channel."""
     response = (
         _client.table(_TABLE)
         .select("*")
-        .eq("source_type", source_type.value)
+        .eq("source", source.value)
         .execute()
     )
     return response.data
@@ -135,7 +135,7 @@ def get_alerts(lookback_hours: int = 72, limit: int = 50) -> list[dict]:
 
 def get_source_summary() -> list[dict]:
     """
-    Aggregate signal counts and latest activity timestamp per source_type.
+    Aggregate signal counts and latest activity timestamp per source.
     Used by GET /api/sources.
 
     Fetches only the two columns needed and aggregates in Python.
@@ -144,17 +144,17 @@ def get_source_summary() -> list[dict]:
     """
     response = (
         _client.table(_TABLE)
-        .select("source_type, created_at")
+        .select("source, created_at")
         .execute()
     )
 
     summary: dict[str, dict] = {}
     for row in response.data:
-        src = row.get("source_type", "unknown")
+        src = row.get("source", "unknown")
         created_at_str = row.get("created_at", "")
 
         if src not in summary:
-            summary[src] = {"source_type": src, "total_signals": 0, "last_seen": None}
+            summary[src] = {"source": src, "total_signals": 0, "last_seen": None}
 
         summary[src]["total_signals"] += 1
 

@@ -68,9 +68,9 @@ def get_signal_by_id(signal_id: str) -> Optional[dict]:
     return None
 
 
-def get_signals_by_source(source_type: SourceType) -> list[dict]:
+def get_signals_by_source(source: SourceType) -> list[dict]:
     """Return all records for a specific source channel."""
-    return [r for r in MOCK_DB if r.get("source_type") == source_type.value]
+    return [r for r in MOCK_DB if r.get("source") == source.value]
 
 
 def get_alerts(lookback_hours: int = 72, limit: int = 50) -> list[dict]:
@@ -106,17 +106,17 @@ def get_alerts(lookback_hours: int = 72, limit: int = 50) -> list[dict]:
 
 def get_source_summary() -> list[dict]:
     """
-    Aggregate signal counts and latest activity timestamp per source_type.
+    Aggregate signal counts and latest activity timestamp per source.
     Used by GET /api/sources.
     """
     summary: dict[str, dict] = {}
 
     for record in MOCK_DB:
-        src = record.get("source_type", "unknown")
+        src = record.get("source", "unknown")
         created_at_str = record.get("created_at", "")
 
         if src not in summary:
-            summary[src] = {"source_type": src, "total_signals": 0, "last_seen": None}
+            summary[src] = {"source": src, "total_signals": 0, "last_seen": None}
 
         summary[src]["total_signals"] += 1
 

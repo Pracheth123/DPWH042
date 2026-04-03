@@ -18,12 +18,12 @@ class SignalIngest(BaseModel):
     """Payload accepted by POST /api/ingest. Intentionally kept as the narrow
     request-body contract — only what the caller provides."""
 
-    source_type: SourceType = Field(
+    source: SourceType = Field(
         ...,
         description="The informal market channel this signal came from.",
         examples=["telegram"],
     )
-    raw_text: str = Field(
+    text: str = Field(
         ...,
         min_length=5,
         max_length=5000,
@@ -35,7 +35,7 @@ class SignalIngest(BaseModel):
         description="Direct link to the original post or listing.",
         examples=["https://www.olx.com.pk/item/xyz"],
     )
-    reported_price: Optional[float] = Field(
+    price: Optional[float] = Field(
         default=None,
         ge=0,
         description="Explicit price mentioned in the post (in local currency).",
@@ -61,22 +61,40 @@ class SignalIngest(BaseModel):
         description="Free-text annotations for edge cases or manual overrides (max 500 chars).",
         examples=["Verified by field agent on 2026-04-03"],
     )
-    region: Optional[str] = Field(
+    location: Optional[str] = Field(
         default=None,
         max_length=100,
         description="Geographic context for the signal, e.g. 'Karachi', 'Northern Nigeria'.",
         examples=["Karachi"],
     )
+    event_time: Optional[str] = Field(
+        default=None,
+        description="Timestamp of when the event originally occurred."
+    )
+    normalized_text: Optional[str] = Field(
+        default=None,
+        description="Text after normalization."
+    )
+    unit: Optional[str] = Field(
+        default=None,
+        max_length=20,
+        description="Unit of measurement for the price, e.g. 'kg'."
+    )
+    category: Optional[str] = Field(
+        default=None,
+        max_length=50,
+        description="A broad categorization."
+    )
 
     model_config = {"json_schema_extra": {"example": {
-        "source_type": "telegram",
-        "raw_text": "آٹا نہیں مل رہا، قیمتیں بڑھ گئی ہیں",
+        "source": "telegram",
+        "text": "آٹا نہیں مل رہا، قیمتیں بڑھ گئی ہیں",
         "source_url": None,
-        "reported_price": None,
+        "price": None,
         "commodity": "flour",
         "message_id": "tg_1234567890",
         "notes": None,
-        "region": "Karachi",
+        "location": "Karachi",
     }}}
 
 
@@ -96,14 +114,18 @@ class SignalRecord(BaseModel):
     created_at: str = Field(..., description="ISO-8601 UTC timestamp set at insert time.")
 
     # ── Caller-provided fields (mirrored from SignalIngest) ───────────────────
-    source_type: SourceType = Field(..., description="Informal market channel.")
-    raw_text: str = Field(..., description="Sanitized content stored after processing.")
+    source: SourceType = Field(..., description="Informal market channel.")
+    text: str = Field(..., description="Sanitized content stored after processing.")
     source_url: Optional[str] = Field(default=None, description="Link to original post.")
-    reported_price: Optional[float] = Field(default=None, ge=0, description="Price mentioned in post.")
+    price: Optional[float] = Field(default=None, ge=0, description="Price mentioned in post.")
     commodity: Optional[str] = Field(default=None, description="Commodity referenced.")
     message_id: Optional[str] = Field(default=None, description="Source system ID (deduplication key).")
     notes: Optional[str] = Field(default=None, description="Edge-case annotations.")
-    region: Optional[str] = Field(default=None, description="Geographic context.")
+    location: Optional[str] = Field(default=None, description="Geographic context.")
+    event_time: Optional[str] = Field(default=None, description="Timestamp of when the event originally occurred.")
+    normalized_text: Optional[str] = Field(default=None, description="Text after normalization.")
+    unit: Optional[str] = Field(default=None, description="Unit of measurement for the price.")
+    category: Optional[str] = Field(default=None, description="A broad categorization.")
 
     # ── NLP-assigned fields ───────────────────────────────────────────────────
     language: SupportedLanguage = Field(..., description="Language detected by the NLP service.")

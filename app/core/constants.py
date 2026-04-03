@@ -11,10 +11,10 @@ from enum import Enum
 
 class SignalType(str, Enum):
     """Classification labels produced by the NLP pipeline."""
-    SHORTAGE      = "shortage_signal"
-    PRICE_HIKE    = "price_hike"
-    URGENCY_SALE  = "urgency_sale"
-    NEUTRAL       = "neutral"
+    SHORTAGE      = "logistics"
+    PRICE_HIKE    = "price"
+    URGENCY_SALE  = "behavior"
+    NEUTRAL       = "news"
 
 
 class SourceType(str, Enum):

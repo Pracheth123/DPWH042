@@ -19,14 +19,14 @@ class AlertResponse(BaseModel):
     """A single alert as returned by GET /api/alerts."""
 
     id: str
-    source_type: SourceType
-    raw_text: str
+    source: SourceType
+    text: str
     commodity: Optional[str] = None
     source_url: Optional[str] = None
-    reported_price: Optional[float] = None
+    price: Optional[float] = None
     message_id: Optional[str] = None
     notes: Optional[str] = None
-    region: Optional[str] = None
+    location: Optional[str] = None
     language: SupportedLanguage
     signal_type: SignalType
     confidence: float
