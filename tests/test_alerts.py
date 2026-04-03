@@ -22,7 +22,7 @@ def clear_db():
     _mock_db.MOCK_DB.clear()
 
 
-def _seed(signal_type: str, score: float, language: str = "en", severity: str = "medium") -> dict:
+def _seed(signal_type: str, confidence: float, language: str = "en", severity: str = "medium") -> dict:
     """Helper: insert a pre-built record directly into MOCK_DB."""
     return _mock_db.insert_signal({
         "source_type": "telegram",
@@ -30,9 +30,12 @@ def _seed(signal_type: str, score: float, language: str = "en", severity: str = 
         "source_url": None,
         "reported_price": None,
         "commodity": "wheat",
+        "message_id": None,
+        "notes": None,
+        "region": None,
         "language": language,
         "signal_type": signal_type,
-        "score": score,
+        "confidence": confidence,
         "severity": severity,
     })
 
@@ -61,12 +64,12 @@ def test_alerts_returns_non_neutral_signals():
     assert data["total"] == 2
 
 
-def test_alerts_sorted_by_score_descending():
+def test_alerts_sorted_by_confidence_descending():
     _seed("shortage_signal", 0.9, severity="high")
     _seed("price_hike", 0.4, severity="medium")
     _seed("urgency_sale", 0.7, severity="high")
     data = client.get("/api/alerts").json()
-    scores = [a["score"] for a in data["alerts"]]
+    scores = [a["confidence"] for a in data["alerts"]]
     assert scores == sorted(scores, reverse=True)
 
 

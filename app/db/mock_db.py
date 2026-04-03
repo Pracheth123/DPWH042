@@ -27,7 +27,22 @@ def insert_signal(record: dict) -> dict:
     """
     Stamp a UUID and creation timestamp onto `record`, append to MOCK_DB,
     and return the persisted version.
+
+    Raises
+    ------
+    ValueError
+        If `message_id` is not None and a record with the same `message_id`
+        already exists in MOCK_DB.
     """
+    incoming_message_id = record.get("message_id")
+    if incoming_message_id is not None:
+        for existing in MOCK_DB:
+            if existing.get("message_id") == incoming_message_id:
+                raise ValueError(
+                    f"Duplicate message_id: a signal with message_id "
+                    f"'{incoming_message_id}' already exists (id={existing.get('id')})."
+                )
+
     persisted = {
         **record,
         "id": str(uuid.uuid4()),
@@ -35,6 +50,7 @@ def insert_signal(record: dict) -> dict:
     }
     MOCK_DB.append(persisted)
     return persisted
+
 
 
 # ── Read ──────────────────────────────────────────────────────────────────────
@@ -60,7 +76,12 @@ def get_signals_by_source(source_type: SourceType) -> list[dict]:
 def get_alerts(lookback_hours: int = 72, limit: int = 50) -> list[dict]:
     """
     Return non-neutral signals created within the last `lookback_hours`,
-    sorted by score descending, capped at `limit`.
+    sorted by confidence descending.
+
+    NOTE: The `limit` parameter is intentionally NOT applied here.
+    It is applied in alert_service.fetch_alerts() *after* all secondary
+    filters (signal_type, severity, language) have been applied, so that
+    `limit` always reflects the final filtered count rather than a pre-filter cap.
     """
     cutoff = datetime.now(tz=timezone.utc) - timedelta(hours=lookback_hours)
 
@@ -79,8 +100,8 @@ def get_alerts(lookback_hours: int = 72, limit: int = 50) -> list[dict]:
         if created_at >= cutoff:
             results.append(record)
 
-    results.sort(key=lambda r: r.get("score", 0), reverse=True)
-    return results[:limit]
+    results.sort(key=lambda r: r.get("confidence", 0), reverse=True)
+    return results
 
 
 def get_source_summary() -> list[dict]:
@@ -107,3 +128,34 @@ def get_source_summary() -> list[dict]:
             pass
 
     return list(summary.values())
+
+
+# ── Update / Delete ───────────────────────────────────────────────────────────
+
+def update_signal(signal_id: str, updates: dict) -> Optional[dict]:
+    """
+    Apply `updates` (a partial dict) to the record matching `signal_id`.
+    Returns the updated record, or None if not found.
+
+    Only keys present in `updates` are changed; all other fields are preserved.
+    The `id` and `created_at` fields cannot be overwritten by this function.
+    """
+    for i, record in enumerate(MOCK_DB):
+        if record.get("id") == signal_id:
+            # Guard immutable fields
+            safe_updates = {k: v for k, v in updates.items() if k not in ("id", "created_at")}
+            MOCK_DB[i] = {**record, **safe_updates}
+            return MOCK_DB[i]
+    return None
+
+
+def delete_signal(signal_id: str) -> bool:
+    """
+    Remove the record matching `signal_id` from MOCK_DB.
+    Returns True if a record was deleted, False if not found.
+    """
+    for i, record in enumerate(MOCK_DB):
+        if record.get("id") == signal_id:
+            MOCK_DB.pop(i)
+            return True
+    return False

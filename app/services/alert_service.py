@@ -28,7 +28,8 @@ def fetch_alerts(
     lookback_hours : int
         Only return alerts created within this many hours.
     limit : int
-        Maximum number of alerts to return (pre-filter cap applied in mock_db).
+        Maximum number of alerts to return. Applied AFTER all secondary
+        filters so the cap always reflects the filtered result set.
     signal_type : SignalType, optional
         If provided, keep only alerts of this crisis category.
     severity : SeverityLevel, optional
@@ -36,6 +37,7 @@ def fetch_alerts(
     language : SupportedLanguage, optional
         If provided, keep only alerts detected in this language.
     """
+    # Fetch all time-window-filtered, confidence-sorted alerts (no limit yet)
     raw_alerts = mock_db.get_alerts(lookback_hours=lookback_hours, limit=limit)
 
     # Apply optional secondary filters
@@ -45,6 +47,9 @@ def fetch_alerts(
         raw_alerts = [r for r in raw_alerts if r.get("severity") == severity.value]
     if language is not None:
         raw_alerts = [r for r in raw_alerts if r.get("language") == language.value]
+
+    # Apply limit AFTER all filters so it reflects the true filtered count
+    raw_alerts = raw_alerts[:limit]
 
     alert_responses = [AlertResponse(**r) for r in raw_alerts]
 

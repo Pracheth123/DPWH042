@@ -24,9 +24,12 @@ class AlertResponse(BaseModel):
     commodity: Optional[str] = None
     source_url: Optional[str] = None
     reported_price: Optional[float] = None
+    message_id: Optional[str] = None
+    notes: Optional[str] = None
+    region: Optional[str] = None
     language: SupportedLanguage
     signal_type: SignalType
-    score: float
+    confidence: float
     severity: SeverityLevel
     created_at: str
 
