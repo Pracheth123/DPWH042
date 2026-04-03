@@ -1,0 +1,2 @@
+{"id": "5b49a4f2-399e-4275-88ab-1557d607eb96", "source": "trends", "commodity": "fuel", "location": "global", "price": null, "text": "search spike: fuel shortage", "timestamp": "2026-04-03T10:46:06.619677", "signal_type": "behavior", "confidence": 0.7}
+{"id": "9a59f080-3bf2-463d-a118-7608ce9fc0b4", "source": "trends", "commodity": "fuel", "location": "global", "price": null, "text": "search spike: rice price", "timestamp": "2026-04-03T10:46:06.619677", "signal_type": "behavior", "confidence": 0.7}

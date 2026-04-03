@@ -1,0 +1,57 @@
+[
+  {
+    "id": "64f4f3d8-67a5-4f68-852d-dd9aa3fced29",
+    "source": "shipping",
+    "commodity": "logistics",
+    "location": "singapore",
+    "price": null,
+    "text": "Port congestion at Singapore, delays expected",
+    "timestamp": "2026-04-03T12:01:57.259610",
+    "signal_type": "logistics",
+    "confidence": 0.85
+  },
+  {
+    "id": "7d3ba4d1-28f3-4623-ab88-4e17ec4f7eff",
+    "source": "shipping",
+    "commodity": "logistics",
+    "location": "dubai",
+    "price": null,
+    "text": "Shipment delay reported in Dubai port",
+    "timestamp": "2026-04-03T12:01:57.260595",
+    "signal_type": "logistics",
+    "confidence": 0.85
+  },
+  {
+    "id": "b245155c-35a6-409a-8153-f939134dc4e1",
+    "source": "shipping",
+    "commodity": "logistics",
+    "location": "singapore",
+    "price": null,
+    "text": "Port congestion at Singapore, delays expected",
+    "timestamp": "2026-04-03T12:02:20.127849",
+    "signal_type": "logistics",
+    "confidence": 0.85
+  },
+  {
+    "id": "e363eaa8-4804-4038-86a6-b1893e7a3104",
+    "source": "shipping",
+    "commodity": "logistics",
+    "location": "dubai",
+    "price": null,
+    "text": "Shipment delay reported in Dubai port",
+    "timestamp": "2026-04-03T12:02:20.127849",
+    "signal_type": "logistics",
+    "confidence": 0.85
+  }
+]{"id": "0aa5a94e-0b23-420d-8b36-3c2b9e6468f6", "source": "shipping", "commodity": "logistics", "location": "singapore", "price": null, "text": "Port congestion at Singapore, delays expected", "timestamp": "2026-04-03T13:44:19.761824", "signal_type": "logistics", "confidence": 0.85}
+{"id": "d799c8e8-7bc7-4566-9ebd-48ebfc166612", "source": "shipping", "commodity": "logistics", "location": "dubai", "price": null, "text": "Shipment delay reported in Dubai port", "timestamp": "2026-04-03T13:44:19.761824", "signal_type": "logistics", "confidence": 0.85}
+{"id": "96588d5d-cb34-43c0-8b4d-6ca15d80cbc1", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Logistics disruptions, port congestion delay imports in Morocco - MSN", "timestamp": "2026-04-03T14:41:21.413277", "signal_type": "logistics", "confidence": 0.9}
+{"id": "9607304a-a200-447f-89cc-d8566ea68b9d", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Port congestion: A guide to measurement, impact & management - Kpler", "timestamp": "2026-04-03T14:41:21.413814", "signal_type": "logistics", "confidence": 0.9}
+{"id": "1f50a8c1-8398-41ea-983c-e42b03e71828", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Port operational updates from around the world (26 June – 4 July 2025) - Kuehne+Nagel", "timestamp": "2026-04-03T14:41:21.413814", "signal_type": "logistics", "confidence": 0.9}
+{"id": "e7201d36-bafd-487e-bd7a-a411600935ac", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Chinese New Year 2026: How to prepare your supply chain - Maersk", "timestamp": "2026-04-03T14:41:21.413814", "signal_type": "logistics", "confidence": 0.9}
+{"id": "5930f424-4d9b-415d-9ed6-ad869429b2e0", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Port congestion delays thousands of UAE bound car exports - Logistics Middle East", "timestamp": "2026-04-03T14:41:21.414817", "signal_type": "logistics", "confidence": 0.9}
+{"id": "523068ae-e71f-45fd-8fac-21699b461a0e", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Red Sea Return Could Flood Europe’s Ports With Cargo - Sourcing Journal", "timestamp": "2026-04-03T14:41:21.414817", "signal_type": "logistics", "confidence": 0.9}
+{"id": "89cff562-3478-4e10-b443-e3bd9e48e76e", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "News Port congestion now a 'significant challenge' to global supply chains - The Loadstar", "timestamp": "2026-04-03T14:41:21.414817", "signal_type": "logistics", "confidence": 0.9}
+{"id": "3881344a-143d-4d6c-a8b6-726e3b225806", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Strikes Worsen Shipping Congestion at Europe’s Two Biggest Ports - Bloomberg.com", "timestamp": "2026-04-03T14:41:21.414817", "signal_type": "logistics", "confidence": 0.9}
+{"id": "25abcaec-3da1-4728-ae37-e3464001ccb6", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Calm before the storm? European port congestion could be about to get a whole lot worse - Lloyd's List", "timestamp": "2026-04-03T14:41:21.416325", "signal_type": "logistics", "confidence": 0.9}
+{"id": "ff0b69eb-19fa-4040-8063-d8e3462e6761", "source": "shipping", "commodity": "logistics", "location": "global", "price": null, "text": "Iran-U.S. war chokes key shipping lane and threatens global cargo industry - NBC News", "timestamp": "2026-04-03T14:41:21.416325", "signal_type": "logistics", "confidence": 0.9}
