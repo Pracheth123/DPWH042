@@ -7,3 +7,5 @@ dvc
 jupyterlab
 python-dotenv
 langdetect
+fastapi[standard]
+uvicorn[standard]
