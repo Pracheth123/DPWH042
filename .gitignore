@@ -2,3 +2,6 @@ data/
 .env
 __pycache__/
 .venv/
+models/
+*.safetensors
+*.bin
