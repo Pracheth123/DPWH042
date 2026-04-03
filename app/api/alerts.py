@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.core.constants import SignalType, SeverityLevel, SupportedLanguage
 from app.core.config import settings
-from app.db import mock_db
+from app.db import get_signal_by_id
 from app.models.alert import AlertListResponse, AlertResponse
 from app.models.signal import SignalRecord
 from app.services import alert_service
@@ -69,7 +69,7 @@ def list_alerts(
     summary="Get a single signal by ID",
 )
 def get_alert(signal_id: str) -> SignalRecord:
-    record = mock_db.get_signal_by_id(signal_id)
+    record = get_signal_by_id(signal_id)
     if record is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

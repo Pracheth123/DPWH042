@@ -1,7 +1,7 @@
 """
 app/services/alert_service.py
 ------------------------------
-Higher-level alert retrieval with optional filtering on top of mock_db.get_alerts().
+Higher-level alert retrieval with optional filtering on top of the active DB backend.
 Consumed by app/api/alerts.py — keeps route handlers thin.
 """
 
@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.core.constants import SignalType, SeverityLevel, SupportedLanguage
-from app.db import mock_db
+from app.db import get_alerts as db_get_alerts
 from app.models.alert import AlertListResponse, AlertResponse
 
 
@@ -38,7 +38,7 @@ def fetch_alerts(
         If provided, keep only alerts detected in this language.
     """
     # Fetch all time-window-filtered, confidence-sorted alerts (no limit yet)
-    raw_alerts = mock_db.get_alerts(lookback_hours=lookback_hours, limit=limit)
+    raw_alerts = db_get_alerts(lookback_hours=lookback_hours, limit=limit)
 
     # Apply optional secondary filters
     if signal_type is not None:

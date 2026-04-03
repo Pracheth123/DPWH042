@@ -9,7 +9,7 @@ Useful for monitoring whether scrapers/collectors are actively feeding data.
 
 from fastapi import APIRouter
 
-from app.db import mock_db
+from app.db import get_source_summary
 
 router = APIRouter(prefix="/api", tags=["sources"])
 
@@ -24,4 +24,4 @@ router = APIRouter(prefix="/api", tags=["sources"])
     ),
 )
 def list_sources() -> list[dict]:
-    return mock_db.get_source_summary()
+    return get_source_summary()

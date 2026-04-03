@@ -10,7 +10,7 @@ Data flow:
         → classify_signal(clean_text, language) → (signal_type, confidence)
         → derive_severity(confidence)           → severity
         → build full record dict
-        → mock_db.insert_signal(record)         → persisted SignalRecord
+        → db.insert_signal(record)              → persisted SignalRecord
 """
 
 import re
@@ -19,7 +19,7 @@ from fastapi import HTTPException, status
 
 from app.models.signal import SignalIngest, SignalRecord
 from app.services import nlp_service
-from app.db import mock_db
+from app.db import insert_signal
 
 
 # Characters to strip: null bytes and C0/C1 control characters,
@@ -70,7 +70,7 @@ def process_and_store(payload: SignalIngest) -> SignalRecord:
     # 6. Persist to MOCK_DB (adds id + created_at)
     #    insert_signal raises ValueError on duplicate message_id → converted to 409.
     try:
-        persisted = mock_db.insert_signal(record_dict)
+        persisted = insert_signal(record_dict)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
