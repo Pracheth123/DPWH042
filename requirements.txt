@@ -6,3 +6,4 @@ torch
 dvc
 jupyterlab
 python-dotenv
+langdetect
