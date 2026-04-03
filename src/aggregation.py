@@ -1,5 +1,5 @@
 """
-GhostGrid — Signal Aggregation Module (C-03 / C-04)
+GhostGrid — Signal Aggregation Module (C-03 / C-04 / C-05)
 
 C-03: Combines the text-classifier's predicted probability array with a
       Pandas DataFrame of numerical listing features (from B-05) into a
@@ -56,11 +56,26 @@ Anomaly Detection (C-04)
   vectorized call.  sklearn's predict() returns {-1, +1}; a vectorized
   comparison converts this to a boolean Series — zero explicit loops.
 
+Alert Level Calibration (C-05)
+-------------------------------
+  alert_level = map_alert_level(crisis_score, is_anomaly) → pd.Series[str]
+
+  Maps crisis_score + is_anomaly flag to a three-tier alert string
+  using ``np.select()`` — a single vectorized dispatch over condition
+  arrays.  No row-iteration, no sequential if/else logic.
+
+  Thresholds
+  ----------
+  HIGH   : crisis_score > 0.75
+           OR (crisis_score > 0.50 AND is_anomaly is True)
+  MEDIUM : crisis_score > 0.35  (and not HIGH)
+  LOW    : everything else (score ≤ 0.35, no anomaly)
+
 Design constraints
 ------------------
 - **Zero explicit ``for`` or ``while`` loops** anywhere in this module.
 - All operations use Pandas / NumPy broadcasting, .dot(), .clip(), .mul(),
-  and sklearn's built-in batch predict/transform methods.
+  np.select(), and sklearn's built-in batch predict/transform methods.
 - Graceful NaN handling: NaN listing features are median-imputed via
   a vectorized .fillna(median) before any sklearn call.
 
@@ -69,6 +84,7 @@ Public API
   compute_crisis_score(text_proba, listing_df, alpha=0.6)   → pd.Series
   batch_crisis_scores(text_proba_matrix, listing_df, alpha) → pd.DataFrame
   detect_listing_anomalies(listing_df, contamination, ...)  → pd.Series[bool]
+  map_alert_level(crisis_score, is_anomaly)                 → pd.Series[str]
   make_dummy_inputs(n=10, seed=42)                          → (np.ndarray, pd.DataFrame)
 """
 
@@ -556,6 +572,119 @@ def detect_listing_anomalies(
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# C-05 — Alert Level Calibration
+# ══════════════════════════════════════════════════════════════════════════
+
+# Threshold constants — single source of truth, easy to tune.
+_ALERT_HIGH_SCORE:         float = 0.75   # unconditional HIGH trigger
+_ALERT_HIGH_ANOMALY_SCORE: float = 0.50   # HIGH when anomaly also flagged
+_ALERT_MEDIUM_SCORE:       float = 0.35   # MEDIUM lower bound
+
+# Output label constants
+ALERT_HIGH:   str = "HIGH"
+ALERT_MEDIUM: str = "MEDIUM"
+ALERT_LOW:    str = "LOW"
+
+
+def map_alert_level(
+    crisis_score: pd.Series,
+    is_anomaly: pd.Series,
+) -> pd.Series:
+    """Map crisis_score + is_anomaly flag to a three-tier alert string.
+
+    Uses ``np.select()`` — a single vectorized dispatch that evaluates
+    a list of boolean condition arrays and returns the matching choice
+    for each row.  **No explicit ``for``/``while`` loops and no
+    row-iterating ``if``/``else`` chains.**
+
+    Threshold logic (evaluated in priority order by np.select)
+    ----------------------------------------------------------
+    HIGH   (priority 1) : crisis_score > 0.75
+                          OR (crisis_score > 0.50 AND is_anomaly == True)
+    MEDIUM (priority 2) : crisis_score > 0.35
+    LOW    (default)    : everything else
+
+    Vectorization strategy
+    ----------------------
+    1. Build boolean condition arrays from Series arithmetic — no loops.
+    2. Pass conditions + choices to ``np.select()`` in one call.
+    3. Wrap result in ``pd.Series`` with the original index preserved.
+
+    Parameters
+    ----------
+    crisis_score : pd.Series
+        Float64 Series of scores in [0.0, 1.0] produced by
+        :func:`compute_crisis_score`.
+    is_anomaly : pd.Series
+        Boolean Series produced by :func:`detect_listing_anomalies`.
+        Must have the same index and length as ``crisis_score``.
+
+    Returns
+    -------
+    pd.Series
+        String Series of the same length, values in
+        ``{'HIGH', 'MEDIUM', 'LOW'}``.  Index is preserved from
+        ``crisis_score``.  Name: ``'alert_level'``.
+
+    Raises
+    ------
+    ValueError
+        If ``crisis_score`` and ``is_anomaly`` have different lengths.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from src.aggregation import map_alert_level
+    >>> scores = pd.Series([0.9, 0.55, 0.20, 0.60])
+    >>> flags  = pd.Series([True, True, False, False])
+    >>> map_alert_level(scores, flags).tolist()
+    ['HIGH', 'HIGH', 'LOW', 'MEDIUM']
+    """
+    if len(crisis_score) != len(is_anomaly):
+        raise ValueError(
+            f"Length mismatch: crisis_score has {len(crisis_score)} rows, "
+            f"is_anomaly has {len(is_anomaly)} rows."
+        )
+
+    # ── Align both inputs to a common integer position index ─────────────
+    # Reset index before building boolean arrays so np.select sees aligned
+    # positional arrays — fully vectorized, no per-row Python code.
+    score_arr   = crisis_score.to_numpy(dtype=np.float64)   # shape (N,)
+    anomaly_arr = is_anomaly.to_numpy(dtype=bool)            # shape (N,)
+
+    # ── Condition arrays — all vectorized NumPy comparisons ───────────────
+    # Condition 1: HIGH — unconditional score threshold
+    cond_high_score   = score_arr > _ALERT_HIGH_SCORE           # (N,) bool
+
+    # Condition 2: HIGH — moderate score + anomaly flag (escalation rule)
+    cond_high_anomaly = (score_arr > _ALERT_HIGH_ANOMALY_SCORE) & anomaly_arr
+
+    # Combined HIGH condition (OR of the two above)
+    cond_high   = cond_high_score | cond_high_anomaly           # (N,) bool
+
+    # Condition 3: MEDIUM — lower bound (evaluated only if not HIGH)
+    cond_medium = score_arr > _ALERT_MEDIUM_SCORE               # (N,) bool
+
+    # ── np.select — single vectorized dispatch, no per-row iteration ──────
+    # Conditions are evaluated in priority order (first match wins).
+    # Default fills the LOW label for all unmatched rows.
+    raw_labels: np.ndarray = np.select(
+        condlist=[cond_high, cond_medium],
+        choicelist=[ALERT_HIGH, ALERT_MEDIUM],
+        default=ALERT_LOW,
+    )   # shape (N,), dtype object (str)
+
+    # ── Wrap in pd.Series with original index ─────────────────────────────
+    alert_level = pd.Series(
+        raw_labels,
+        index=crisis_score.index,
+        name="alert_level",
+        dtype="object",
+    )
+    return alert_level
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Dummy data generator — for smoke tests and unit tests
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -802,4 +931,80 @@ if __name__ == "__main__":
 
     print(f"\n{SEP}")
     print("  C-04 Smoke Test PASSED — detect_listing_anomalies() is production-ready.")
+    print(SEP)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # C-05 — Alert level calibration tests
+    # ══════════════════════════════════════════════════════════════════════
+    print(f"\n{SEP}")
+    print("  GhostGrid C-05 — Alert Level Calibration Smoke Test")
+    print(SEP)
+
+    # ── 11. Deterministic pinned test — known scores + flags → expected labels
+    print("\n[11] Pinned label mapping test (known inputs → expected outputs) …")
+    pinned_scores = pd.Series([0.90, 0.60, 0.55, 0.40, 0.20, 0.76, 0.35, 0.51])
+    pinned_flags  = pd.Series([False, False, True, False, True, False, True, False])
+    #   0.90 + False  → HIGH   (score > 0.75)
+    #   0.60 + False  → MEDIUM (score > 0.35, not anomaly, < 0.75)
+    #   0.55 + True   → HIGH   (score > 0.50 AND anomaly)
+    #   0.40 + False  → MEDIUM (score > 0.35)
+    #   0.20 + True   → LOW    (score ≤ 0.35)
+    #   0.76 + False  → HIGH   (score > 0.75)
+    #   0.35 + True   → LOW    (score NOT > 0.35; not > 0.50)
+    #   0.51 + False  → MEDIUM (score > 0.35, not anomaly)
+    expected = ["HIGH", "MEDIUM", "HIGH", "MEDIUM", "LOW", "HIGH", "LOW", "MEDIUM"]
+
+    alerts_pinned = map_alert_level(pinned_scores, pinned_flags)
+    print(f"\n    input scores : {pinned_scores.tolist()}")
+    print(f"    input flags  : {pinned_flags.tolist()}")
+    print(f"    expected     : {expected}")
+    print(f"    got          : {alerts_pinned.tolist()}")
+
+    assert alerts_pinned.tolist() == expected, (
+        f"FAIL: label mismatch\n  expected: {expected}\n  got     : {alerts_pinned.tolist()}"
+    )
+    print("    [✓] All 8 pinned labels correct — assertion passed")
+
+    # ── 12. dtype and value-set assertion ──────────────────────────────────
+    assert alerts_pinned.dtype == object,                           "FAIL: wrong dtype"
+    assert set(alerts_pinned.unique()).issubset({"HIGH","MEDIUM","LOW"}), "FAIL: unexpected label"
+    print("    [✓] dtype == object (string)   — assertion passed")
+    print("    [✓] Values in {HIGH,MEDIUM,LOW} — assertion passed")
+
+    # ── 13. End-to-end pipeline: proba → score → anomaly → alert ──────────
+    print(f"\n{SEP}")
+    print("[13] Full end-to-end pipeline on 50 rows …")
+    proba_e2e, feats_e2e = make_dummy_inputs(n=50, seed=7)
+    scores_e2e  = compute_crisis_score(proba_e2e, feats_e2e, alpha=0.6)
+    anomaly_e2e = detect_listing_anomalies(feats_e2e, contamination=0.1)
+    alerts_e2e  = map_alert_level(scores_e2e, anomaly_e2e)
+
+    dist = alerts_e2e.value_counts().to_dict()
+    print(f"    crisis_score range : [{scores_e2e.min():.4f}, {scores_e2e.max():.4f}]")
+    print(f"    anomalies flagged  : {anomaly_e2e.sum()}")
+    print(f"    alert distribution : {dist}")
+
+    assert set(alerts_e2e.unique()).issubset({"HIGH","MEDIUM","LOW"}), "FAIL: invalid labels"
+    assert alerts_e2e.notna().all(),                                    "FAIL: NaN in alerts"
+    assert len(alerts_e2e) == 50,                                       "FAIL: length mismatch"
+    print("    [✓] All labels in valid set    — assertion passed")
+    print("    [✓] No NaN in alert output     — assertion passed")
+    print("    [✓] Output length == 50        — assertion passed")
+
+    # ── 14. batch_crisis_scores integration (alert column appended) ────────
+    print(f"\n{SEP}")
+    print("[14] Append alert_level to batch_crisis_scores output …")
+    batch_e2e = batch_crisis_scores(proba_e2e, feats_e2e, alpha=0.6)
+    batch_e2e["is_anomaly"]  = anomaly_e2e.values
+    batch_e2e["alert_level"] = map_alert_level(
+        batch_e2e["crisis_score"], batch_e2e["is_anomaly"]
+    ).values
+    final_cols = list(batch_e2e.columns)
+    print(f"    Final DataFrame columns : {final_cols}")
+    assert "alert_level" in final_cols, "FAIL: alert_level column missing"
+    print("    [✓] alert_level column present — assertion passed")
+
+    print(f"\n{SEP}")
+    print("  C-05 Smoke Test PASSED — map_alert_level() is production-ready.")
+    print(f"  Full pipeline C-03 → C-04 → C-05 validated end-to-end.")
     print(SEP)
