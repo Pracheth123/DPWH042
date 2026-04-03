@@ -1,9 +1,15 @@
 """
-GhostGrid -- mBERT Evaluation Harness (D-01)
+GhostGrid -- mBERT Evaluation Harness (D-01 / D-02)
 
 D-01: Loads the fine-tuned mBERT from models/ghostgrid_mbert/, maps it
       to the GPU (CUDA), runs inference over the full mock_samples.csv
       dataset, and reports a complete per-class evaluation suite.
+
+D-02: Extends D-01 with a labelled confusion matrix and vectorized
+      'hard negative mining' — identifies rows where a truly 'neutral'
+      message was falsely classified as 'shortage_signal' or 'price_hike'
+      (the most operationally dangerous prediction errors), and saves
+      them to data/processed/hard_negatives.csv for future retraining.
 
 Metrics reported (per class)
 -----------------------------
@@ -12,23 +18,33 @@ Metrics reported (per class)
   F1-score         – 2 * P * R / (P + R)    [macro + weighted averages]
   False Positive Rate (FPR)  – FP / (FP + TN)   [derived from confusion matrix]
 
+Hard Negative Mining (D-02)
+----------------------------
+  Condition (vectorized boolean mask, no loops):
+    true_label == 'neutral'  AND  predicted_label ∈ {'shortage_signal', 'price_hike'}
+
+  These are the highest-risk errors: the model generates a spurious
+  supply-chain crisis alert for a completely normal message.
+  Saving them enables targeted data augmentation and retraining.
+
 Design constraints
 ------------------
-- **Zero explicit ``for`` or ``while`` loops** anywhere.
-- Inference uses HuggingFace ``pipeline()`` with ``batch_size`` so the
-  transformer processes all samples in vectorized GPU batches — not one
-  by one in Python.
-- All post-processing (label extraction, FPR derivation) uses purely
-  vectorized Pandas / NumPy operations on the full result set at once.
-- Reproducible: fixed random_state throughout where applicable.
+- **Zero explicit ``for`` or ``while`` loops** anywhere in this file.
+- Inference: single ``pipeline()`` call, GPU-batched by HuggingFace.
+- Hard negative extraction: single-expression Pandas boolean mask
+  (``df[mask]``) — no row iteration at any point.
+- Confusion matrix: built by ``pd.DataFrame()`` constructor from a
+  NumPy ndarray in one vectorized call.
 
 Public functions
 ----------------
-  load_pipeline(model_dir, device)           → transformers.Pipeline
-  load_dataset(data_path)                    → pd.DataFrame
-  run_inference(pipe, texts, batch_size)     → pd.Series  (predicted labels)
-  compute_fpr_per_class(cm, label_order)     → pd.Series  (FPR per class)
-  evaluate(model_dir, data_path, batch_size) → pd.DataFrame (full report)
+  load_pipeline(model_dir, device)                    → transformers.Pipeline
+  load_dataset(data_path)                             → pd.DataFrame
+  run_inference(pipe, texts, batch_size)              → pd.DataFrame
+  compute_fpr_per_class(cm, label_order)              → pd.Series
+  render_confusion_matrix(cm, label_order)            → pd.DataFrame
+  mine_hard_negatives(df, true_class, false_classes)  → pd.DataFrame
+  evaluate(model_dir, data_path, batch_size)          → pd.DataFrame
 """
 
 from __future__ import annotations
@@ -51,9 +67,10 @@ from transformers import pipeline as hf_pipeline
 warnings.filterwarnings("ignore")
 
 # ── Paths ──────────────────────────────────────────────────────────────────
-ROOT_DIR   = pathlib.Path(__file__).resolve().parents[1]
-MODEL_DIR  = ROOT_DIR / "models" / "ghostgrid_mbert"
-DATA_PATH  = ROOT_DIR / "data" / "raw" / "mock_samples.csv"
+ROOT_DIR            = pathlib.Path(__file__).resolve().parents[1]
+MODEL_DIR           = ROOT_DIR / "models" / "ghostgrid_mbert"
+DATA_PATH           = ROOT_DIR / "data" / "raw" / "mock_samples.csv"
+HARD_NEGATIVES_PATH = ROOT_DIR / "data" / "processed" / "hard_negatives.csv"
 
 # ── Label schema — matches config.json id2label ────────────────────────────
 LABEL_ORDER: list[str] = [
@@ -290,7 +307,141 @@ def compute_fpr_per_class(
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# 6. FULL EVALUATION PIPELINE
+# 6. CONFUSION MATRIX RENDERER  (D-02)
+# ══════════════════════════════════════════════════════════════════════════
+
+def render_confusion_matrix(
+    cm: np.ndarray,
+    label_order: list[str],
+) -> pd.DataFrame:
+    """Build a fully-labelled confusion matrix DataFrame.
+
+    Wraps the raw (K, K) NumPy array returned by sklearn with human-readable
+    row/column labels so misclassification patterns are immediately visible.
+
+    Construction is fully vectorized — ``pd.DataFrame()`` takes the entire
+    NumPy matrix in a single call.  Row/column labels use list comprehensions
+    (not loops over data rows).
+
+    Layout
+    ------
+    Rows    → true class   (what the sample actually was)
+    Columns → predicted class (what the model said)
+
+    Diagonal cells = correct predictions (TP per class).
+    Off-diagonal cells = misclassifications.
+
+    Parameters
+    ----------
+    cm : np.ndarray
+        Shape (K, K) integer confusion matrix from
+        ``sklearn.metrics.confusion_matrix(labels=label_order)``.
+    label_order : list[str]
+        Ordered class names matching the matrix axes.
+
+    Returns
+    -------
+    pd.DataFrame
+        Labelled confusion matrix; index = actual labels,
+        columns = predicted labels.
+    """
+    # pd.DataFrame constructor — one vectorized call, no row loops
+    cm_df = pd.DataFrame(
+        cm,
+        index   = pd.Index([f"actual::{lbl}"    for lbl in label_order], name="true \\ pred"),
+        columns = pd.Index([f"pred::{lbl}" for lbl in label_order]),
+    )
+    return cm_df
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 7. HARD NEGATIVE MINING  (D-02)
+# ══════════════════════════════════════════════════════════════════════════
+
+def mine_hard_negatives(
+    df: pd.DataFrame,
+    true_col:      str        = "label",
+    pred_col:      str        = "predicted_label",
+    true_class:    str        = "neutral",
+    false_classes: list[str] | None = None,
+) -> pd.DataFrame:
+    """Extract rows where a 'neutral' message was falsely classified as a crisis class.
+
+    Uses a **single vectorized Pandas boolean mask** — no explicit ``for``
+    or ``while`` loops, no ``.iterrows()`` or ``.itertuples()``.
+
+    Hard negative definition
+    ------------------------
+    A hard negative is a row where:
+      - The **true** label is ``true_class`` (default: ``'neutral'``)
+      - The **predicted** label is one of ``false_classes``
+        (default: ``['shortage_signal', 'price_hike']``)
+
+    These are the most operationally dangerous errors: the model fires a
+    supply-chain crisis alert on a completely normal message.  Collecting
+    them enables targeted retraining to raise the model's specificity.
+
+    Vectorization strategy
+    ----------------------
+    mask  = (df[true_col] == true_class)          # (N,) boolean Series
+            & (df[pred_col].isin(false_classes))  # (N,) boolean Series
+    result = df[mask]                              # single boolean-index slice
+
+    Both operands are vectorized Pandas operations.  The ``&`` combines
+    them element-wise (NumPy-backed).  ``df[mask]`` performs the slice in
+    one C-level operation — no Python row iteration.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Full predictions DataFrame containing at least ``true_col`` and
+        ``pred_col`` columns (typically the output of ``evaluate()``).
+    true_col : str
+        Column name for the ground-truth labels.  Default ``'label'``.
+    pred_col : str
+        Column name for the model predictions.  Default ``'predicted_label'``.
+    true_class : str
+        The ground-truth class to treat as the "benign" class whose false
+        positives we want to capture.  Default ``'neutral'``.
+    false_classes : list[str] | None
+        Predicted classes that constitute a false positive for ``true_class``.
+        Default: ``['shortage_signal', 'price_hike']``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Filtered subset of ``df`` containing only the hard negative rows,
+        with all original columns preserved.  Empty DataFrame if none exist.
+    """
+    if false_classes is None:
+        false_classes = ["shortage_signal", "price_hike"]
+
+    # ── Vectorized boolean mask — two Series operations combined with & ────
+    # Step 1: (N,) bool — which rows have the true benign label
+    mask_true  = df[true_col] == true_class
+
+    # Step 2: (N,) bool — which rows were predicted as a crisis class
+    # .isin() is a vectorized membership test over the entire column at once
+    mask_false = df[pred_col].isin(false_classes)
+
+    # Step 3: element-wise AND — both conditions must hold
+    mask = mask_true & mask_false              # (N,) bool, fully vectorized
+
+    # Step 4: boolean-index slice — single C-level filtered view
+    hard_negatives = df[mask].copy()
+
+    # Add a diagnostic column showing the error direction (vectorized concat)
+    if not hard_negatives.empty:
+        hard_negatives["error_type"] = (
+            "FP: neutral→" + hard_negatives[pred_col]
+        )
+
+    return hard_negatives.reset_index(drop=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 8. FULL EVALUATION PIPELINE  (D-01 + D-02)
+# ══════════════════════════════════════════════════════════════════════════
 # ══════════════════════════════════════════════════════════════════════════
 
 def evaluate(
@@ -318,7 +469,7 @@ def evaluate(
     SEP = "=" * 72
 
     print(SEP)
-    print("  GhostGrid D-01 — mBERT Evaluation Harness")
+    print("  GhostGrid D-01 / D-02 — mBERT Evaluation + Hard Negative Mining")
     print(SEP)
 
     # ── Step 1: Device ────────────────────────────────────────────────────
@@ -417,37 +568,81 @@ def evaluate(
     print(SEP)
     print(report_df.to_string(index=False))
 
-    # ── Step 10: Confusion matrix display ────────────────────────────────
-    print(f"\n[8] Confusion Matrix:")
+    # ── Step 10: Confusion matrix — D-02 ─────────────────────────────────
+    print(f"\n[8] Confusion Matrix (D-02):")
     print(SEP)
-    cm_df = pd.DataFrame(
-        cm,
-        index=[f"true:{l}"  for l in LABEL_ORDER],
-        columns=[f"pred:{l}" for l in LABEL_ORDER],
-    )
+    cm_df = render_confusion_matrix(cm, LABEL_ORDER)
     print(cm_df.to_string())
 
-    # ── Step 11: Prediction sample ────────────────────────────────────────
-    print(f"\n[9] Prediction sample (first 10 rows):")
+    # Highlight worst off-diagonal error cell (vectorized argmax on masked matrix)
+    cm_no_diag = cm.copy().astype(float)
+    np.fill_diagonal(cm_no_diag, np.nan)            # mask diagonal (correct preds)
+    if not np.all(np.isnan(cm_no_diag)):            # guard: at least one error
+        flat_idx   = np.nanargmax(cm_no_diag)       # vectorized argmax over all errors
+        worst_true = LABEL_ORDER[flat_idx // len(LABEL_ORDER)]
+        worst_pred = LABEL_ORDER[flat_idx %  len(LABEL_ORDER)]
+        worst_count = int(np.nanmax(cm_no_diag))
+        print(f"\n    Worst misclassification : true='{worst_true}' → pred='{worst_pred}' "
+              f"({worst_count} {'case' if worst_count == 1 else 'cases'})")
+
+    # ── Step 11: Hard negative mining — D-02 ─────────────────────────────
+    print(f"\n{SEP}")
+    print("[9] Hard Negative Mining (D-02):")
+    print(SEP)
+    print("    Condition: true='neutral' AND predicted ∈ {'shortage_signal','price_hike'}")
+
+    hard_negs = mine_hard_negatives(
+        df,
+        true_col      = "label",
+        pred_col      = "predicted_label",
+        true_class    = "neutral",
+        false_classes = ["shortage_signal", "price_hike"],
+    )
+
+    print(f"    Hard negatives found  : {len(hard_negs)}")
+
+    if hard_negs.empty:
+        print("    [✓] No hard negatives — model correctly handles all neutral messages!")
+    else:
+        display_cols = ["message_id", "raw_text", "label", "predicted_label",
+                        "confidence", "error_type"]
+        # Keep only columns that exist in the DataFrame
+        display_cols = [c for c in display_cols if c in hard_negs.columns]
+        print("\n    Hard negative rows:")
+        # str truncation is vectorized — .str[:70] operates on whole column at once
+        disp = hard_negs[display_cols].copy()
+        if "raw_text" in disp.columns:
+            disp["raw_text"] = disp["raw_text"].str[:65] + "…"
+        print(disp.to_string(index=False))
+
+    # ── Step 12: Save hard negatives to CSV ──────────────────────────────
+    HARD_NEGATIVES_PATH.parent.mkdir(parents=True, exist_ok=True)
+    hard_negs.to_csv(HARD_NEGATIVES_PATH, index=False)
+    print(f"\n    Saved → {HARD_NEGATIVES_PATH}  ({len(hard_negs)} rows)")
+
+    # ── Step 13: Prediction sample ────────────────────────────────────────
+    print(f"\n[10] Prediction sample (first 10 rows):")
     print(SEP)
     sample_cols = ["raw_text", "label", "predicted_label", "confidence"]
     sample = df[sample_cols].head(10).copy()
     sample["correct"] = (sample["label"] == sample["predicted_label"])
-    sample["raw_text"] = sample["raw_text"].str[:60] + "…"
+    sample["raw_text"] = sample["raw_text"].str[:58] + "…"
     print(sample.to_string(index=False))
 
-    # ── Step 12: Summary banner ───────────────────────────────────────────
+    # ── Step 14: Summary banner ───────────────────────────────────────────
     print(f"\n{SEP}")
-    print("  D-01 Evaluation Summary")
+    print("  D-01 / D-02 Evaluation Summary")
     print(SEP)
     macro_f1  = f1.mean()
     macro_fpr = fpr.mean()
-    print(f"  Overall accuracy   : {accuracy:.4f}")
-    print(f"  Macro F1           : {macro_f1:.4f}")
-    print(f"  Macro FPR          : {macro_fpr:.4f}")
-    print(f"  Samples evaluated  : {len(df)}")
-    print(f"  Model              : {model_dir.name}")
-    print(f"  Device             : {'CUDA (GPU)' if dev_int == 0 else 'CPU'}")
+    print(f"  Overall accuracy     : {accuracy:.4f}")
+    print(f"  Macro F1             : {macro_f1:.4f}")
+    print(f"  Macro FPR            : {macro_fpr:.4f}")
+    print(f"  Samples evaluated    : {len(df)}")
+    print(f"  Hard negatives found : {len(hard_negs)}")
+    print(f"  Hard negatives saved : {HARD_NEGATIVES_PATH.name}")
+    print(f"  Model                : {model_dir.name}")
+    print(f"  Device               : {'CUDA (GPU)' if dev_int == 0 else 'CPU'}")
     print(SEP)
 
     return report_df
