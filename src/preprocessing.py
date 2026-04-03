@@ -1,11 +1,13 @@
 """
-GhostGrid – Text Preprocessing Pipeline (B-01 / B-02)
+GhostGrid – Text Preprocessing Pipeline (B-01 / B-02 / B-04)
 
 B-01: Vectorized language detection  (EN, HI, UR, unknown).
 B-02: Multilingual text normalizer   (URLs, noise, SMS abbreviations).
+B-04: Text signal feature extraction (crisis keywords, polarity, hour-of-day).
 """
 
 import re
+from typing import List
 
 import pandas as pd
 from langdetect import detect, LangDetectException
@@ -69,6 +71,51 @@ _RE_EMOJI    = re.compile(
 )
 _RE_SPECIAL  = re.compile(r"[^\w\s.,!?؟،۔]+", re.UNICODE)
 _RE_MULTI_WS = re.compile(r"\s{2,}")
+
+# ── B-04: Crisis / signal keyword groups ─────────────────────────────────
+# Each group maps to one new binary-sum feature column.
+_CRISIS_KEYWORD_GROUPS: dict[str, List[str]] = {
+    # ---------- shortage signals ----------
+    "kw_shortage": [
+        "shortage", "sold out", "out of stock", "band ho gayi",
+        "stock nahi", "nahi mil", "unavailable", "not available",
+        "khatam", "supply band", "cannot find", "can't find",
+        # Urdu / romanized
+        "نہیں ملتا", "ختم", "دستیاب نہیں",
+    ],
+    # ---------- price hike signals ----------
+    "kw_price": [
+        "price", "rate", "mahenga", "mehnga", "upar gaya", "jumped",
+        "increased", "doubled", "per kg", "aed", "inr", "pkr",
+        "قیمت", "ریٹ", "مہنگا", "بڑھ گئی",
+    ],
+    # ---------- urgency / distress sale ----------
+    "kw_urgency": [
+        "urgent", "urgently", "asap", "fauran", "jaldi", "today only",
+        "must sell", "clearance", "closing", "last chance", "foori",
+        "فوری", "جلدی", "آخری موقع",
+    ],
+    # ---------- general commodity mentions ----------
+    "kw_commodity": [
+        "cement", "steel", "rebar", "oil", "chicken", "rice", "wheat",
+        "flour", "sugar", "chawal", "atta", "cheeni",
+        "چاول", "آٹا", "چینی",
+    ],
+}
+
+# ── B-04: Simple lexicon-based polarity word lists ───────────────────────
+_POSITIVE_WORDS: List[str] = [
+    "good", "great", "excellent", "fine", "normal", "standard",
+    "available", "ready", "smooth", "cheap", "affordable",
+    "theek", "sahi", "accha", "badhiya",
+    "ٹھیک", "اچھا",
+]
+_NEGATIVE_WORDS: List[str] = [
+    "bad", "shortage", "unavailable", "expensive", "crisis",
+    "problem", "mushkil", "nahi", "band", "sold out", "jump",
+    "bura", "dikkat", "takleef",
+    "مہنگا", "نہیں", "بند", "مشکل",
+]
 
 
 def _detect_language(text: str) -> str:
@@ -168,6 +215,91 @@ def add_language_column(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def extract_text_signals(df: pd.DataFrame) -> pd.DataFrame:
+    """B-04 — Extract numerical signal features from cleaned text.
+
+    All operations are fully vectorized (no explicit Python loops over rows).
+    New columns added
+    -----------------
+    kw_shortage   : int  – count of shortage-related keyword matches (0/1 per kw, summed)
+    kw_price      : int  – count of price-hike keyword matches
+    kw_urgency    : int  – count of urgency/distress-sale keyword matches
+    kw_commodity  : int  – count of commodity-name keyword matches
+    polarity_score: int  – net polarity  (+1 per positive word, -1 per negative word)
+    hour_of_day   : int  – hour extracted from the ``timestamp`` column (0-23);
+                           set to -1 when ``timestamp`` is missing or unparseable.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Must contain a ``clean_text`` column (output of
+        :func:`normalize_text_pipeline`).  Optionally contains
+        a ``timestamp`` column (ISO-8601 string or datetime).
+
+    Returns
+    -------
+    pd.DataFrame
+        A copy with the new feature columns appended.
+
+    Raises
+    ------
+    KeyError
+        If ``clean_text`` column is missing.
+    """
+    if "clean_text" not in df.columns:
+        raise KeyError(
+            "DataFrame must contain a 'clean_text' column. "
+            "Run normalize_text_pipeline() first."
+        )
+
+    result = df.copy()
+    text = result["clean_text"].astype(str)
+
+    # ── Keyword group features: count how many distinct keywords match ──────
+    # For each group, build one boolean Series per keyword with .str.contains(),
+    # stack them into a DataFrame column-wise, and sum across axis=1.
+    # Result is an integer ≥ 0 (number of distinct keywords matched per row).
+    for col_name, keywords in _CRISIS_KEYWORD_GROUPS.items():
+        # One boolean column per keyword, then row-wise sum → integer feature
+        match_matrix = pd.concat(
+            [
+                text.str.contains(kw, case=False, regex=False, na=False)
+                for kw in keywords
+            ],
+            axis=1,
+        )
+        result[col_name] = match_matrix.sum(axis=1).astype("int8")
+
+    # ── Polarity score: positive – negative keyword counts ─────────────────
+    pos_matrix = pd.concat(
+        [
+            text.str.contains(w, case=False, regex=False, na=False)
+            for w in _POSITIVE_WORDS
+        ],
+        axis=1,
+    )
+    neg_matrix = pd.concat(
+        [
+            text.str.contains(w, case=False, regex=False, na=False)
+            for w in _NEGATIVE_WORDS
+        ],
+        axis=1,
+    )
+    result["polarity_score"] = (
+        pos_matrix.sum(axis=1).astype(int) - neg_matrix.sum(axis=1).astype(int)
+    )
+
+    # ── Hour-of-day from timestamp ──────────────────────────────────────────
+    if "timestamp" in result.columns:
+        ts = pd.to_datetime(result["timestamp"], errors="coerce")
+        result["hour_of_day"] = ts.dt.hour.fillna(-1).astype(int)
+    else:
+        # Column absent — fill sentinel so the schema stays consistent
+        result["hour_of_day"] = -1
+
+    return result
+
+
 # ── CLI entry-point for quick testing ────────────────────────────────────
 if __name__ == "__main__":
     import pathlib
@@ -197,3 +329,19 @@ if __name__ == "__main__":
     print(tagged_df[["message_id", "clean_text", "language"]].to_string(index=False))
     print("=" * 72)
     print(f"\nLanguage distribution:\n{tagged_df['language'].value_counts().to_string()}")
+
+    # B-04: Extract text signal features
+    featured_df = extract_text_signals(tagged_df)
+    print()
+    print("=" * 72)
+    print("  GhostGrid B-04 — Text Signal Features Preview")
+    print("=" * 72)
+    feature_cols = [
+        "message_id", "language",
+        "kw_shortage", "kw_price", "kw_urgency", "kw_commodity",
+        "polarity_score", "hour_of_day",
+    ]
+    print(featured_df[feature_cols].to_string(index=False))
+    print("=" * 72)
+    print("\nFeature column dtypes:")
+    print(featured_df[feature_cols[2:]].dtypes.to_string())
