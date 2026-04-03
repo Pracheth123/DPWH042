@@ -1,35 +1,37 @@
 """
-GhostGrid — Pydantic API I/O Schema  (E-02)
-============================================
+GhostGrid — Pydantic API I/O Schema  (Phase 05 — DB-aligned)
+=============================================================
 
-Defines the strict JSON contract between the FastAPI endpoint and any
-downstream consumer (dashboard, webhook, batch job).
+Updated to match the Data Engineering team's PostgreSQL column names exactly.
 
 Classes
 -------
 PredictRequest
-    Input payload accepted by POST /predict.
-    Contains:
-      • raw_texts      — list of raw SMS / marketplace strings to classify.
-      • listing_features — numeric signals from B-05 feature engineering,
-                           keyed by feature name.
+    Input payload accepted by POST /v1/predict.
+    Fields mirror the DB ingest columns:
+      • normalized_text  — pre-cleaned text string from the ETL pipeline.
+      • commodity        — commodity / product category tag (e.g. "atta", "LPG").
+      • source           — originating data source (e.g. "sms", "marketplace").
 
 PredictResponse
-    Output payload returned by POST /predict.
-    Contains:
-      • predictions    — one dict per input text with:
-                           - signal_label  : argmax class name
-                           - crisis_score  : weighted float in [0.0, 1.0]
-      • overall_alert_level : aggregate tier string (HIGH | MEDIUM | LOW)
+    Output payload returned by POST /v1/predict.
+    Fields mirror the DB prediction columns:
+      • signal_type   — mBERT argmax label string.
+      • confidence    — model's max-class probability in [0.0, 1.0].
+      • severity      — tiered string derived from confidence:
+                           high   → confidence > 0.75
+                           medium → confidence in (0.35, 0.75]
+                           low    → confidence ≤ 0.35
+      • category      — domain grouping derived from signal_type:
+                           supply      ← shortage_signal
+                           demand      ← urgency_sale
+                           disruption  ← price_hike
+                           supply      ← neutral  (default / uncategorised)
 
-Design rules enforced here
---------------------------
-• All fields carry Field() with explicit descriptions so the auto-generated
-  OpenAPI docs are immediately usable without any extra annotation.
-• model_config carries a json_schema_extra example that the backend team
-  (and FastAPI's /docs SwaggerUI) can copy-paste directly.
-• Literal types are used for alert_level and signal_label so OpenAPI
-  clients receive proper enum constraints, not open strings.
+Design rules
+------------
+• All fields carry Field() with explicit descriptions for OpenAPI docs.
+• Literal types enforce enum constraints on all categorical outputs.
 • No explicit for / while loops anywhere in this module.
 """
 
@@ -39,61 +41,28 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-# ── Public label / alert types ────────────────────────────────────────────
-# Mirrors LABEL_ORDER in aggregation.py — single source of truth for consumers.
+# ── Canonical type aliases (single source of truth for consumers) ──────────
 
-SignalLabel = Literal[
+SignalType = Literal[
     "shortage_signal",
     "price_hike",
     "urgency_sale",
     "neutral",
 ]
 
-AlertLevel = Literal["HIGH", "MEDIUM", "LOW"]
+Severity = Literal["low", "medium", "high"]
+
+Category = Literal["supply", "demand", "disruption"]
 
 
-# ── Sub-models ────────────────────────────────────────────────────────────
-
-class PredictionItem(BaseModel):
-    """Per-text classification result included in PredictResponse.predictions."""
-
-    signal_label: Annotated[
-        SignalLabel,
-        Field(
-            description=(
-                "Argmax class predicted by the mBERT classifier for this text. "
-                "One of: shortage_signal | price_hike | urgency_sale | neutral."
-            ),
-            examples=["shortage_signal"],
-        ),
-    ]
-
-    crisis_score: Annotated[
-        float,
-        Field(
-            ge=0.0,
-            le=1.0,
-            description=(
-                "Composite crisis score in [0.0, 1.0] blending text-classifier "
-                "probability (α=0.6) with normalised listing feature signal "
-                "(β=0.4). Higher values indicate stronger supply-chain stress."
-            ),
-            examples=[0.8714],
-        ),
-    ]
-
-
-# ── Request model ─────────────────────────────────────────────────────────
+# ── Request model ─────────────────────────────────────────────────────────────
 
 class PredictRequest(BaseModel):
     """
-    Input payload for POST /predict.
+    Input payload for POST /v1/predict.
 
-    Supply one or more raw SMS / marketplace text strings alongside
-    numerical listing feature observations (from B-05 feature engineering).
-    The number of texts and the number of rows implied by ``listing_features``
-    must match: each numeric column should contain exactly ``len(raw_texts)``
-    values.
+    Matches the Data Engineering ETL ingest columns exactly so the
+    downstream INSERT statement needs zero field renaming.
 
     Example JSON body
     -----------------
@@ -101,127 +70,144 @@ class PredictRequest(BaseModel):
     renders this as a live copy-paste example.
     """
 
-    raw_texts: Annotated[
-        list[str],
+    normalized_text: Annotated[
+        str,
         Field(
             min_length=1,
             description=(
-                "Ordered list of raw input strings to classify. "
-                "Accepts English, Romanised Hindi, and Urdu Nastaliq. "
-                "Must contain at least one element. "
-                "Length N must equal the row count implied by listing_features."
+                "Pre-cleaned, normalised text string produced by the ETL "
+                "pipeline. Accepts English, Romanised Hindi, and Urdu Nastaliq. "
+                "Must be non-empty."
             ),
-            examples=[
-                [
-                    "Atta price doubled overnight, no stock anywhere!!!",
-                    "Limited supply — buy before it's gone 🔥",
-                    "Normal delivery, prices stable.",
-                ]
-            ],
+            examples=["atta ki qeemat do guna ho gayi hai, stock khatam"],
         ),
     ]
 
-    listing_features: Annotated[
-        dict[str, list[float]],
+    commodity: Annotated[
+        str,
         Field(
+            min_length=1,
             description=(
-                "Numeric listing signals produced by B-05's "
-                "build_daily_feature_vectors(). "
-                "Each key is a feature column name; each value is a list of N "
-                "floats (one per text in raw_texts). "
-                "Recognised keys: "
-                "price_pressure_index, listing_count_pct_change, price_pct_change, "
-                "supply_pressure_index, listing_count_delta. "
-                "Unknown keys are silently ignored; missing recognised keys fall "
-                "back to a neutral 0.5 sub-signal."
+                "Commodity or product category tag as defined by the Data "
+                "Engineering taxonomy (e.g. 'atta', 'LPG', 'petrol', 'rice'). "
+                "Stored verbatim in the DB commodity column."
             ),
-            examples=[
-                {
-                    "price_pressure_index":     [1.42, 1.18, 0.97],
-                    "listing_count_pct_change": [-35.0, -12.5, 1.3],
-                    "price_pct_change":         [22.5, 8.0, 0.5],
-                }
-            ],
+            examples=["atta"],
+        ),
+    ]
+
+    source: Annotated[
+        str,
+        Field(
+            min_length=1,
+            description=(
+                "Originating data source identifier "
+                "(e.g. 'sms', 'marketplace', 'social_media', 'news_feed'). "
+                "Stored verbatim in the DB source column."
+            ),
+            examples=["marketplace"],
         ),
     ]
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "raw_texts": [
-                    "Atta price doubled overnight, no stock anywhere!!!",
-                    "Limited supply — buy before it's gone 🔥",
-                    "Normal delivery, prices stable.",
-                ],
-                "listing_features": {
-                    "price_pressure_index":     [1.42, 1.18, 0.97],
-                    "listing_count_pct_change": [-35.0, -12.5, 1.3],
-                    "price_pct_change":         [22.5, 8.0, 0.5],
-                },
+                "normalized_text": "atta ki qeemat do guna ho gayi hai, stock khatam",
+                "commodity":       "atta",
+                "source":          "marketplace",
             }
         }
     }
 
 
-# ── Response model ────────────────────────────────────────────────────────
+# ── Response model ────────────────────────────────────────────────────────────
 
 class PredictResponse(BaseModel):
     """
-    Output payload returned by POST /predict.
+    Output payload returned by POST /v1/predict.
 
-    predictions
-        One :class:`PredictionItem` per element in the request's raw_texts,
-        preserving input order.  Each item carries the argmax signal_label
-        and the individual composite crisis_score.
+    All field names match the PostgreSQL predictions table columns exactly.
 
-    overall_alert_level
-        Aggregate severity tier computed by map_alert_level() (C-05) over
-        all crisis scores + anomaly flags in this batch.
-        HIGH   → at least one score > 0.75 or (score > 0.50 and anomaly flagged)
-        MEDIUM → highest score in (0.35, 0.75]
-        LOW    → all scores ≤ 0.35 with no anomaly
+    signal_type
+        Argmax class label from the mBERT classifier.
+        One of: shortage_signal | price_hike | urgency_sale | neutral.
+
+    confidence
+        Model's softmax probability for the predicted class, in [0.0, 1.0].
+        Reflects the classifier's certainty — not a blended aggregate score.
+
+    severity
+        Tiered alert string derived from confidence:
+          high   → confidence > 0.75
+          medium → confidence in (0.35, 0.75]
+          low    → confidence ≤ 0.35
+
+    category
+        Broad domain grouping derived from signal_type:
+          supply      ← shortage_signal  (supply-side stress)
+          demand      ← urgency_sale     (demand-side pressure)
+          disruption  ← price_hike       (market / price disruption)
+          supply      ← neutral          (default grouping)
     """
 
-    predictions: Annotated[
-        list[PredictionItem],
+    signal_type: Annotated[
+        SignalType,
         Field(
             description=(
-                "Ordered list of per-text prediction results. "
-                "Length equals len(request.raw_texts). "
-                "Each item contains signal_label and crisis_score."
+                "Argmax class predicted by the mBERT classifier. "
+                "One of: shortage_signal | price_hike | urgency_sale | neutral."
             ),
-            examples=[
-                [
-                    {"signal_label": "shortage_signal", "crisis_score": 0.8714},
-                    {"signal_label": "urgency_sale",    "crisis_score": 0.6231},
-                    {"signal_label": "neutral",         "crisis_score": 0.1042},
-                ]
-            ],
+            examples=["shortage_signal"],
         ),
     ]
 
-    overall_alert_level: Annotated[
-        AlertLevel,
+    confidence: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            description=(
+                "Softmax probability of the predicted class in [0.0, 1.0]. "
+                "Higher values indicate stronger model certainty."
+            ),
+            examples=[0.8921],
+        ),
+    ]
+
+    severity: Annotated[
+        Severity,
         Field(
             description=(
-                "Aggregate alert tier for the entire batch. "
-                "Determined by map_alert_level() (C-05) applied to the "
-                "maximum crisis_score + IsolationForest anomaly flag. "
-                "Possible values: HIGH | MEDIUM | LOW."
+                "Alert severity derived from confidence. "
+                "high → confidence > 0.75 | "
+                "medium → confidence in (0.35, 0.75] | "
+                "low → confidence ≤ 0.35."
             ),
-            examples=["HIGH"],
+            examples=["high"],
+        ),
+    ]
+
+    category: Annotated[
+        Category,
+        Field(
+            description=(
+                "Domain category derived from signal_type. "
+                "shortage_signal → supply | "
+                "urgency_sale → demand | "
+                "price_hike → disruption | "
+                "neutral → supply."
+            ),
+            examples=["supply"],
         ),
     ]
 
     model_config = {
         "json_schema_extra": {
             "example": {
-                "predictions": [
-                    {"signal_label": "shortage_signal", "crisis_score": 0.8714},
-                    {"signal_label": "urgency_sale",    "crisis_score": 0.6231},
-                    {"signal_label": "neutral",         "crisis_score": 0.1042},
-                ],
-                "overall_alert_level": "HIGH",
+                "signal_type": "shortage_signal",
+                "confidence":  0.8921,
+                "severity":    "high",
+                "category":    "supply",
             }
         }
     }
