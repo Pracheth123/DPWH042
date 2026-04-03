@@ -1,9 +1,14 @@
 """
-GhostGrid — Signal Aggregation Module (C-03)
+GhostGrid — Signal Aggregation Module (C-03 / C-04)
 
 C-03: Combines the text-classifier's predicted probability array with a
       Pandas DataFrame of numerical listing features (from B-05) into a
       single, interpretable ``crisis_score`` in [0.0, 1.0].
+
+C-04: Adds an unsupervised anomaly detection layer using Isolation Forest
+      (sklearn) applied directly to the listing feature matrix.  Outputs
+      a boolean ``is_anomaly`` flag per row — True = anomalous listing
+      behaviour (sudden price/volume regime shift), False = normal.
 
 Architecture
 ------------
@@ -43,29 +48,38 @@ Final formula (per row, fully vectorized)
   listing_norm = clip(listing_raw, 0, 1)
   crisis_score = clip(α·text_score + β·listing_norm, 0, 1)
 
+Anomaly Detection (C-04)
+------------------------
+  is_anomaly = detect_listing_anomalies(listing_df) → pd.Series[bool]
+
+  IsolationForest is fit on the full listing feature matrix in one
+  vectorized call.  sklearn's predict() returns {-1, +1}; a vectorized
+  comparison converts this to a boolean Series — zero explicit loops.
+
 Design constraints
 ------------------
-- **Zero explicit ``for`` or ``while`` loops** — all operations use
-  Pandas / NumPy broadcasting, .dot(), .clip(), and .mul().
-- All intermediate values remain Pandas Series / DataFrames so
-  the transformation graph is fully auditable.
-- Graceful NaN handling: NaN listing features default to 0.5
-  (neutral) via .fillna() before blending.
+- **Zero explicit ``for`` or ``while`` loops** anywhere in this module.
+- All operations use Pandas / NumPy broadcasting, .dot(), .clip(), .mul(),
+  and sklearn's built-in batch predict/transform methods.
+- Graceful NaN handling: NaN listing features are median-imputed via
+  a vectorized .fillna(median) before any sklearn call.
 
 Public API
 ----------
-  compute_crisis_score(text_proba, listing_df, alpha=0.6) → pd.Series
-  batch_crisis_scores(text_proba_matrix, listing_df, alpha=0.6) → pd.Series
-  make_dummy_inputs(n=10, seed=42) → (np.ndarray, pd.DataFrame)
+  compute_crisis_score(text_proba, listing_df, alpha=0.6)   → pd.Series
+  batch_crisis_scores(text_proba_matrix, listing_df, alpha) → pd.DataFrame
+  detect_listing_anomalies(listing_df, contamination, ...)  → pd.Series[bool]
+  make_dummy_inputs(n=10, seed=42)                          → (np.ndarray, pd.DataFrame)
 """
 
 from __future__ import annotations
 
-import pathlib
 import warnings
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.impute import SimpleImputer
 
 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
@@ -396,6 +410,152 @@ def batch_crisis_scores(
 
 
 # ══════════════════════════════════════════════════════════════════════════
+# C-04 — Anomaly Detection Layer
+# ══════════════════════════════════════════════════════════════════════════
+
+# Default feature columns fed to Isolation Forest.
+# All are continuous numeric signals produced by B-05.
+_ANOMALY_FEATURE_COLS: list[str] = [
+    "price_pressure_index",       # price vs. rolling mean ratio
+    "listing_count_pct_change",   # supply velocity
+    "price_pct_change",           # raw price momentum
+    "supply_pressure_index",      # listing count vs. rolling mean ratio
+    "listing_count_delta",        # absolute supply change
+]
+
+
+def detect_listing_anomalies(
+    listing_df: pd.DataFrame,
+    contamination: float = 0.1,
+    n_estimators: int = 100,
+    random_state: int = 42,
+    feature_cols: list[str] | None = None,
+) -> pd.Series:
+    """Flag anomalous rows in the listing feature DataFrame.
+
+    Fits an ``IsolationForest`` on the numeric listing feature matrix in
+    a single vectorized call — **no explicit ``for`` or ``while`` loops**.
+
+    Algorithm overview
+    ------------------
+    IsolationForest isolates observations by randomly partitioning the
+    feature space.  Anomalous points (sudden price spikes, supply collapses,
+    unusual volume surges) require fewer partitions to isolate and therefore
+    receive a negative anomaly score from sklearn's internal scorer.
+
+    Vectorization strategy
+    ----------------------
+    1. ``listing_df[feature_cols].values``  → NumPy matrix  (N, F)  — no loop
+    2. ``SimpleImputer.fit_transform()``    → median-fills NaN     — vectorized
+    3. ``IsolationForest.fit_predict()``    → shape (N,) {-1, +1}  — vectorized
+    4. ``pd.Series(raw == -1)``             → boolean mask          — vectorized
+
+    No row-level Python iteration is used at any point.
+
+    Parameters
+    ----------
+    listing_df : pd.DataFrame
+        Numeric listing feature DataFrame produced by B-05.  Any subset of
+        ``_ANOMALY_FEATURE_COLS`` that is present will be used; missing
+        columns are silently excluded.  Must have at least 1 usable column
+        and at least ``max(2, int(contamination * N) + 1)`` rows.
+
+    contamination : float, optional
+        Expected proportion of anomalies in the dataset.  Passed directly
+        to ``IsolationForest(contamination=...)``.  Default 0.1 (10%).
+        Must be in (0.0, 0.5].
+
+    n_estimators : int, optional
+        Number of isolation trees.  Default 100.
+
+    random_state : int, optional
+        Seed for reproducibility.  Default 42.
+
+    feature_cols : list[str] | None, optional
+        Explicit list of columns to use.  If None (default), uses the
+        intersection of ``_ANOMALY_FEATURE_COLS`` with columns present
+        in ``listing_df``.
+
+    Returns
+    -------
+    pd.Series
+        Boolean Series of length N aligned to ``listing_df.index``.
+        ``True``  → row is flagged as anomalous (IsolationForest score < 0)
+        ``False`` → row is within the expected distribution
+
+        Name: ``"is_anomaly"``
+
+    Raises
+    ------
+    ValueError
+        If no usable numeric columns are found, or if the DataFrame has
+        fewer rows than required for the IsolationForest to function.
+
+    Examples
+    --------
+    >>> import pandas as pd, numpy as np
+    >>> from src.aggregation import detect_listing_anomalies, make_dummy_inputs
+    >>> _, feats = make_dummy_inputs(n=50, seed=0)
+    >>> flags = detect_listing_anomalies(feats)
+    >>> flags.dtype
+    dtype('bool')
+    >>> flags.sum()   # number of anomalies flagged
+    5
+    """
+    # ── 1. Resolve which feature columns to use ───────────────────────────
+    cols_to_use = (
+        feature_cols
+        if feature_cols is not None
+        else [c for c in _ANOMALY_FEATURE_COLS if c in listing_df.columns]
+    )
+
+    if not cols_to_use:
+        raise ValueError(
+            "No usable anomaly feature columns found in listing_df. "
+            f"Expected at least one of: {_ANOMALY_FEATURE_COLS}. "
+            f"Got columns: {list(listing_df.columns)}"
+        )
+
+    min_rows = max(2, int(contamination * len(listing_df)) + 1)
+    if len(listing_df) < min_rows:
+        raise ValueError(
+            f"listing_df has {len(listing_df)} rows but IsolationForest "
+            f"requires at least {min_rows} rows for contamination={contamination}."
+        )
+
+    # ── 2. Extract feature matrix — vectorized NumPy slice ────────────────
+    # .values produces a (N, F) float64 ndarray in one call — no loops.
+    X_raw: np.ndarray = listing_df[cols_to_use].values.astype(np.float64)
+
+    # ── 3. Median imputation for NaN — vectorized sklearn transformer ─────
+    # SimpleImputer.fit_transform() operates on the whole matrix at once.
+    imputer = SimpleImputer(strategy="median")
+    X_clean: np.ndarray = imputer.fit_transform(X_raw)   # shape (N, F)
+
+    # ── 4. Fit + predict in one vectorized sklearn call ───────────────────
+    # IsolationForest.fit_predict() returns an (N,) int array:
+    #   +1 → inlier (normal)    -1 → outlier (anomaly)
+    iso = IsolationForest(
+        n_estimators=n_estimators,
+        contamination=contamination,
+        random_state=random_state,
+        n_jobs=-1,       # use all available cores
+    )
+    raw_flags: np.ndarray = iso.fit_predict(X_clean)   # (N,) — fully vectorized
+
+    # ── 5. Convert {-1, +1} → boolean — vectorized NumPy comparison ───────
+    # raw_flags == -1  is a vectorized element-wise comparison (no loops).
+    is_anomaly = pd.Series(
+        raw_flags == -1,
+        index=listing_df.index,
+        name="is_anomaly",
+        dtype=bool,
+    )
+
+    return is_anomaly
+
+
+# ══════════════════════════════════════════════════════════════════════════
 # Dummy data generator — for smoke tests and unit tests
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -486,7 +646,7 @@ if __name__ == "__main__":
     SEP = "=" * 72
 
     print(SEP)
-    print("  GhostGrid C-03 — Signal Aggregation Smoke Test")
+    print("  GhostGrid C-03 / C-04 — Signal Aggregation & Anomaly Detection Smoke Test")
     print(SEP)
 
     # ── 1. Generate dummy inputs ──────────────────────────────────────────
@@ -566,4 +726,80 @@ if __name__ == "__main__":
 
     print(f"\n{SEP}")
     print("  C-03 Smoke Test PASSED — aggregation.py is production-ready.")
+    print(SEP)
+
+    # ══════════════════════════════════════════════════════════════════════
+    # C-04 — Isolation Forest anomaly detection tests
+    # ══════════════════════════════════════════════════════════════════════
+    print(f"\n{SEP}")
+    print("  GhostGrid C-04 — Isolation Forest Anomaly Detection Smoke Test")
+    print(SEP)
+
+    # ── 6. Generate a larger dataset so IsolationForest has enough samples ─
+    print("\n[6] Generating 50 dummy samples for anomaly detection (seed=0) …")
+    _, feats_50 = make_dummy_inputs(n=50, seed=0)
+    print(f"    listing_df shape : {feats_50.shape}")
+    print(f"    columns          : {list(feats_50.columns)}")
+    print(f"    NaN count        : {feats_50.isna().sum().to_dict()}")
+
+    # ── 7. Run detect_listing_anomalies ────────────────────────────────────
+    print("\n[7] Running detect_listing_anomalies(contamination=0.1) …")
+    anomaly_flags = detect_listing_anomalies(feats_50, contamination=0.1)
+
+    n_anomalies = anomaly_flags.sum()
+    n_normal    = (~anomaly_flags).sum()
+    print(f"\n    is_anomaly Series dtype  : {anomaly_flags.dtype}")
+    print(f"    Total rows               : {len(anomaly_flags)}")
+    print(f"    Flagged as anomaly       : {n_anomalies}  ({n_anomalies/len(anomaly_flags)*100:.1f}%)")
+    print(f"    Flagged as normal        : {n_normal}")
+    print(f"    Anomaly row indices      : {anomaly_flags[anomaly_flags].index.tolist()}")
+
+    # Dtype and range assertions
+    assert anomaly_flags.dtype == bool,          "FAIL: dtype must be bool"
+    assert anomaly_flags.notna().all(),           "FAIL: NaN in is_anomaly output"
+    assert len(anomaly_flags) == 50,              "FAIL: output length mismatch"
+    assert 0 < n_anomalies < 50,                  "FAIL: all rows flagged same class"
+    print("\n    [✓] dtype == bool                    — assertion passed")
+    print("    [✓] No NaN in output                 — assertion passed")
+    print("    [✓] Output length matches input      — assertion passed")
+    print("    [✓] Mix of True and False flags      — assertion passed")
+
+    # ── 8. Anomaly overlap with high crisis scores ─────────────────────────
+    print(f"\n{SEP}")
+    print("[8] Cross-tabulating anomaly flags vs. crisis_score …")
+    proba_50, _ = make_dummy_inputs(n=50, seed=0)
+    scores_50   = compute_crisis_score(proba_50, feats_50, alpha=0.6)
+
+    # Vectorized boolean indexing — no loops
+    high_crisis = scores_50 > 0.6
+    overlap = (high_crisis & anomaly_flags).sum()
+    print(f"    High-crisis rows (score>0.6)        : {high_crisis.sum()}")
+    print(f"    Anomaly-flagged rows                : {n_anomalies}")
+    print(f"    Overlap (anomaly AND high-crisis)   : {overlap}")
+
+    # ── 9. Edge case — custom feature_cols ────────────────────────────────
+    print(f"\n{SEP}")
+    print("[9] Edge case — custom feature_cols=['price_pressure_index'] …")
+    flags_custom = detect_listing_anomalies(
+        feats_50,
+        contamination=0.1,
+        feature_cols=["price_pressure_index"],
+    )
+    assert flags_custom.dtype == bool,  "FAIL: custom cols dtype"
+    assert len(flags_custom) == 50,     "FAIL: custom cols length"
+    print(f"    Anomalies with single feature : {flags_custom.sum()}")
+    print("    [✓] Custom feature_cols — assertion passed")
+
+    # ── 10. Edge case — missing column gracefully excluded ─────────────────
+    print(f"\n{SEP}")
+    print("[10] Edge case — listing_df with only 2 of the expected columns …")
+    feats_minimal = feats_50[["price_pressure_index", "price_pct_change"]].copy()
+    flags_minimal = detect_listing_anomalies(feats_minimal, contamination=0.1)
+    assert flags_minimal.dtype == bool, "FAIL: minimal cols dtype"
+    assert len(flags_minimal) == 50,    "FAIL: minimal cols length"
+    print(f"    Anomalies with 2 features : {flags_minimal.sum()}")
+    print("    [✓] Partial column set handled — assertion passed")
+
+    print(f"\n{SEP}")
+    print("  C-04 Smoke Test PASSED — detect_listing_anomalies() is production-ready.")
     print(SEP)
