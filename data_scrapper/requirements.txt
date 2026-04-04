@@ -1,2 +1,5 @@
-telethon
+pyrogram>=2.0.0
+TgCrypto>=1.2.3
+python-dotenv>=1.0.0
 requests
+feedparser

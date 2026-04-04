@@ -41,7 +41,16 @@ export function AlertsProvider({ children }) {
 
   // WebSocket — real-time push from backend /ws/signals
   useEffect(() => {
-    const wsUrl = `${import.meta.env.VITE_API_BASE_URL.replace('http', 'ws')}/ws/signals`
+    // When VITE_API_BASE_URL is empty (Vercel relative-URL mode), derive
+    // the WebSocket URL from the current page's host so we never get ws:///
+    const apiBase = import.meta.env.VITE_API_BASE_URL
+    let wsUrl
+    if (apiBase) {
+      wsUrl = `${apiBase.replace(/^http/, 'ws')}/ws/signals`
+    } else {
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      wsUrl = `${proto}://${window.location.host}/ws/signals`
+    }
     const ws = new WebSocket(wsUrl)
 
     ws.onmessage = (event) => {

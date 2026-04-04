@@ -78,3 +78,7 @@ htmlcov/
 *.bak
 *.tmp
 *.swp
+
+# ─── Telegram / Pyrogram session files (NEVER commit) ────────────────────────
+*.session
+*.session-journal

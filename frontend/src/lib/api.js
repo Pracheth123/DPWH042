@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// Empty string = relative URLs (same domain, used on Vercel)
+// Defined URL = absolute (local dev pointing to localhost:8000)
+const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
 export const api = axios.create({
   baseURL: BASE,
