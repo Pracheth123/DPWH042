@@ -61,7 +61,7 @@ import pathlib
 # ── Configuration ─────────────────────────────────────────────────────────────
 _ROOT      : pathlib.Path = pathlib.Path(__file__).resolve().parents[1]
 _MODEL_DIR : pathlib.Path = _ROOT / "models" / "ghostgrid_mbert"
-_PORT      : int          = int(os.getenv("GG_PORT", "8000"))
+_PORT      : int          = int(os.getenv("GG_PORT", "8001"))   # 8001 — backend uses 8000
 _HOST      : str          = "0.0.0.0"
 _POLL_INTERVAL : float    = 0.5   # seconds between readiness polls
 _STARTUP_TIMEOUT: float   = 120.0 # max seconds to wait for uvicorn to bind

@@ -1,7 +1,80 @@
-data/raw/
-.env
+# ─── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# ─── Virtual Environments ─────────────────────────────────────────────────────
 .venv/
-models/
+venv/
+env/
+ENV/
+
+# ─── Sensitive / Secrets ──────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Model weights (large binary files — do NOT commit) ───────────────────────
 *.safetensors
 *.bin
+*.pt
+*.pth
+*.onnx
+nlp_model/models/
+
+# ─── Node / Frontend ──────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.npm/
+
+# ─── IDE / Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.code-workspace
+*.sublime-project
+*.sublime-workspace
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs & temp output ───────────────────────────────────────────────────────
+*.log
+*.txt.bak
+out.txt
+smoke_test_output.txt
+test_out*.txt
+test_output*.txt
+test_results.txt
+test_final.txt
+merge_output.txt
+
+# ─── Scraped data (large, regenerated on every run) ───────────────────────────
+data_scrapper/data/
+data_scrapper/*.zip
+data_scrapper/ghostgrid_project_unzipped/
+
+# ─── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── pytest / coverage ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─── Misc ─────────────────────────────────────────────────────────────────────
+*.bak
+*.tmp
+*.swp

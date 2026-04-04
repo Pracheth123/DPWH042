@@ -1,0 +1,62 @@
+"""
+app/core/constants.py
+---------------------
+Type-safe enums used across the entire codebase.
+All categorical values (signal types, sources, languages, severity) are
+defined here — never as bare strings — to prevent typos and enable validation.
+"""
+
+from enum import Enum
+
+
+class SignalType(str, Enum):
+    """Classification labels produced by the NLP pipeline."""
+    SHORTAGE      = "logistics"
+    PRICE_HIKE    = "price"
+    URGENCY_SALE  = "behavior"
+    NEUTRAL       = "news"
+
+
+class SourceType(str, Enum):
+    """Informal market channels that feed signals into GhostGrid."""
+    TELEGRAM      = "telegram"
+    WHATSAPP      = "whatsapp"
+    OLX           = "olx"
+    FORUM         = "forum"
+    MANUAL        = "manual"
+    # ── Scraper pipeline sources ──────────────────────────────────────────────
+    NEWS          = "news"
+    RSS           = "rss"
+    SHIPPING      = "shipping"
+    CUSTOMS       = "customs"
+    TRENDS        = "trends"
+    COMMODITY_API = "commodity_api"
+
+
+class SupportedLanguage(str, Enum):
+    """Languages the NLP pipeline can detect and classify."""
+    URDU    = "ur"
+    ARABIC  = "ar"
+    SWAHILI = "sw"
+    ENGLISH = "en"
+    UNKNOWN = "unknown"
+
+
+class SeverityLevel(str, Enum):
+    """
+    Derived from the NLP confidence score:
+      LOW    → 0.10 – 0.39
+      MEDIUM → 0.40 – 0.69
+      HIGH   → 0.70 – 1.00
+    """
+    LOW    = "low"
+    MEDIUM = "medium"
+    HIGH   = "high"
+
+
+# ── Score thresholds (used by nlp_service.derive_severity) ────────────────────
+SEVERITY_THRESHOLDS = {
+    SeverityLevel.HIGH:   0.70,
+    SeverityLevel.MEDIUM: 0.40,
+    SeverityLevel.LOW:    0.10,
+}

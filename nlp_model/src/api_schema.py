@@ -1,8 +1,18 @@
 """
-GhostGrid — Pydantic API I/O Schema  (Phase 05 — DB-aligned)
+GhostGrid — Pydantic API I/O Schema  (Phase 06 — Bug-fixed)
 =============================================================
 
 Updated to match the Data Engineering team's PostgreSQL column names exactly.
+
+Bug-fix changes (2026-04-04)
+-----------------------------
+  BUG-1 fix: PredictResponse now includes ``commodity`` (Optional[str]).
+             Previously commodity was never returned even though the request
+             schema accepted it — now extracted and echoed back.
+  BUG-2 fix: PredictResponse now includes ``flagged`` (bool).
+             The 3-gate filter in api_server.py populates this field;
+             downstream consumers must use it instead of rolling their own
+             threshold logic.
 
 Classes
 -------
@@ -27,6 +37,8 @@ PredictResponse
                            demand      ← urgency_sale
                            disruption  ← price_hike
                            supply      ← neutral  (default / uncategorised)
+      • commodity     — resolved commodity category (BUG-1 fix).
+      • flagged       — True only if all 3 gates pass (BUG-2 fix).
 
 Design rules
 ------------
@@ -37,7 +49,7 @@ Design rules
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -84,17 +96,19 @@ class PredictRequest(BaseModel):
     ]
 
     commodity: Annotated[
-        str,
+        Optional[str],
         Field(
-            min_length=1,
+            default=None,
             description=(
                 "Commodity or product category tag as defined by the Data "
                 "Engineering taxonomy (e.g. 'atta', 'LPG', 'petrol', 'rice'). "
-                "Stored verbatim in the DB commodity column."
+                "Optional — if omitted or empty, the API will attempt to extract "
+                "the commodity from normalized_text via keyword scan (BUG-1 fix). "
+                "Stored in the DB commodity column."
             ),
             examples=["atta"],
         ),
-    ]
+    ] = None
 
     source: Annotated[
         str,
@@ -148,6 +162,18 @@ class PredictResponse(BaseModel):
           demand      ← urgency_sale     (demand-side pressure)
           disruption  ← price_hike       (market / price disruption)
           supply      ← neutral          (default grouping)
+
+    commodity  [BUG-1 fix]
+        Commodity category resolved from request payload or text extraction.
+        None if no keyword matched and request had no commodity.
+
+    flagged  [BUG-2 fix]
+        True only if all 3 gates pass:
+          GATE 1 — confidence ≥ 0.65
+          GATE 2 — signal_type in {shortage_signal, price_hike} or
+                   urgency_sale with confidence ≥ 0.80
+          GATE 3 — Z-score > 2.0 (or baseline window < 10, gate skipped)
+        Consumers MUST use this field instead of rolling their own threshold.
     """
 
     signal_type: Annotated[
@@ -201,6 +227,47 @@ class PredictResponse(BaseModel):
         ),
     ]
 
+    commodity: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description=(
+                "[BUG-1 fix] Resolved commodity category. "
+                "Set from request.commodity if provided; otherwise extracted from "
+                "normalized_text via a 12-category keyword dictionary. "
+                "None if no keyword matched."
+            ),
+            examples=["wheat"],
+        ),
+    ] = None
+
+    location: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description=(
+                "City extracted from normalized_text via keyword scan. "
+                "None if no known city keyword is found."
+            ),
+            examples=["karachi"],
+        ),
+    ] = None
+
+    flagged: Annotated[
+        bool,
+        Field(
+            default=False,
+            description=(
+                "[BUG-2 fix] True only if the 3-gate filter passes: "
+                "GATE 1 confidence ≥ 0.65 AND "
+                "GATE 2 signal_type in alertable set AND "
+                "GATE 3 Z-score > 2.0 (or baseline window < 10 → gate skipped). "
+                "Consumers MUST use this field for alert decisions."
+            ),
+            examples=[True],
+        ),
+    ] = False
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -208,6 +275,9 @@ class PredictResponse(BaseModel):
                 "confidence":  0.8921,
                 "severity":    "high",
                 "category":    "supply",
+                "commodity":   "wheat",
+                "location":    "karachi",
+                "flagged":     True,
             }
         }
     }

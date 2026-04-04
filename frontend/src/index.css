@@ -1,0 +1,124 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-bg: #0a0f1a;
+    --color-sidebar: #111827;
+    --color-card: #1a2235;
+    --color-border: #1e2d45;
+    --color-high: #E24B4A;
+    --color-medium: #EF9F27;
+    --color-low: #378ADD;
+    --color-behavior: #7F77DD;
+    --color-success: #1D9E75;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: #0a0f1a;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #111827;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1e2d45;
+    border-radius: 2px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2d4a6e;
+  }
+}
+
+@layer utilities {
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .glow-red {
+    box-shadow: 0 0 12px rgba(226, 75, 74, 0.4);
+  }
+  .glow-amber {
+    box-shadow: 0 0 12px rgba(239, 159, 39, 0.4);
+  }
+  .glow-blue {
+    box-shadow: 0 0 12px rgba(55, 138, 221, 0.4);
+  }
+  .glow-green {
+    box-shadow: 0 0 12px rgba(29, 158, 117, 0.4);
+  }
+  .glow-purple {
+    box-shadow: 0 0 12px rgba(127, 119, 221, 0.4);
+  }
+
+  .card {
+    background-color: #1a2235;
+    border: 1px solid #1e2d45;
+    border-radius: 0.75rem;
+  }
+
+  .terminal-font {
+    font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+}
+
+@keyframes slide-in-top {
+  0%   { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInFromTop {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pingOnce {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.5); opacity: 0; }
+}
+
+.animate-slide-in-top {
+  animation: slide-in-top 0.2s ease-out forwards;
+}
+
+.animate-slide-in-right {
+  animation: slideInFromRight 0.35s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}

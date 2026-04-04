@@ -1,0 +1,11 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0
+rootdir: D:\AB\DP World
+plugins: anyio-4.13.0
+collected 36 items
+
+tests\test_alerts.py .........                                           [ 25%]
+tests\test_ingest.py ............                                        [ 58%]
+tests\test_nlp_service.py ...............                                [100%]
+
+============================= 36 passed in 1.62s ==============================

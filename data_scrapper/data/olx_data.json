@@ -1,0 +1,9 @@
+{}
+{"id": "3f575bc3-b4e2-4bb5-ad6c-7ffd7dbbd6ea", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 120.0, "text": "Petrol for sale urgent 120", "timestamp": "2026-04-03T11:46:02.716173", "signal_type": "price", "confidence": 0.9}
+{"id": "19cd665c-9fd7-4617-80ff-e9a491fb7cf6", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 95.0, "text": "Diesel available 95", "timestamp": "2026-04-03T11:46:02.717538", "signal_type": "price", "confidence": 0.9}
+{"id": "a9dc1cab-9a2f-4f26-b623-1c867bcaa48c", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 120.0, "text": "Petrol for sale urgent 120", "timestamp": "2026-04-03T11:46:21.788139", "signal_type": "price", "confidence": 0.9}
+{"id": "b79c4ef3-18d3-40ef-a51f-9230f48278ad", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 95.0, "text": "Diesel available 95", "timestamp": "2026-04-03T11:46:21.788139", "signal_type": "price", "confidence": 0.9}
+{"id": "81111ddc-0f3c-4cb9-a136-5fe168efe3d3", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 120.0, "text": "Petrol for sale urgent 120", "timestamp": "2026-04-03T11:47:28.991069", "signal_type": "price", "confidence": 0.9}
+{"id": "5dce7847-829b-4cec-b85d-56e7872c30a6", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 95.0, "text": "Diesel available 95", "timestamp": "2026-04-03T11:47:28.991929", "signal_type": "price", "confidence": 0.9}
+{"id": "b90bba41-5b41-486b-bf53-72b2a7126dbc", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 120.0, "text": "Petrol for sale urgent 120", "timestamp": "2026-04-04T01:53:00.927773", "signal_type": "price", "confidence": 0.9}
+{"id": "cd357014-e98e-4999-85b2-e30a9d26c3d5", "source": "olx", "commodity": "fuel", "location": "unknown", "price": 95.0, "text": "Diesel available 95", "timestamp": "2026-04-04T01:53:00.927773", "signal_type": "price", "confidence": 0.9}

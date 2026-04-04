@@ -1,0 +1,2 @@
+# Raw scraped dumps (JSON/CSV from Telegram bots, OLX scrapers, forum crawlers).
+# Files in this directory are git-ignored — do not commit raw data.
