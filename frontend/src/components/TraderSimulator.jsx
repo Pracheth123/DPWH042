@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -209,6 +210,7 @@ export default function TraderSimulator() {
   const [activeScenario, setActiveScenario] = useState(SCENARIOS[0])
   const [mitigationApplied, setMitigationApplied] = useState(false)
   const [stepsExpanded, setStepsExpanded] = useState(true)
+  const navigate = useNavigate()
 
   const s = activeScenario
   const sev = SEVERITY_LABEL[s.severity]
@@ -563,7 +565,9 @@ export default function TraderSimulator() {
                 Act within <span className="text-amber-400 font-mono font-bold">{s.action.timeToAct}</span> to preserve {s.action.savings} in projected revenue
               </p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white transition-all"
+            <button
+              onClick={() => navigate('/alerts')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95"
               style={{ background: 'linear-gradient(135deg, #E24B4A, #7F77DD)', boxShadow: '0 4px 16px rgba(226,75,74,0.3)' }}>
               View Full Alert <ArrowRight size={14} />
             </button>

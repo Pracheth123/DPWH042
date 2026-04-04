@@ -101,7 +101,7 @@ export default function Analytics() {
   const axisStyle = { fill: '#64748b', fontSize: 11 }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="h-full overflow-y-auto p-6 space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -127,7 +127,7 @@ export default function Analytics() {
       </div>
 
       {/* Line chart — volume by signal type */}
-      <div className="card p-6">
+      <div className="card p-6" style={{ minHeight: 360 }}>
         <p className="text-slate-300 font-semibold text-sm mb-5">Signal Volume Over Time</p>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={lineData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
@@ -160,7 +160,7 @@ export default function Analytics() {
 
       <div className="grid grid-cols-2 gap-6">
         {/* Horizontal bar — commodity */}
-        <div className="card p-6">
+        <div className="card p-6" style={{ minHeight: 340 }}>
           <p className="text-slate-300 font-semibold text-sm mb-5">Signals by Commodity</p>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart
@@ -182,7 +182,7 @@ export default function Analytics() {
         </div>
 
         {/* Histogram — confidence */}
-        <div className="card p-6">
+        <div className="card p-6" style={{ minHeight: 340 }}>
           <p className="text-slate-300 font-semibold text-sm mb-5">Confidence Distribution</p>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={histData} margin={{ top: 0, right: 10, left: -20, bottom: 0 }}>
