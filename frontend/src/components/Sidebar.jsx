@@ -10,12 +10,12 @@ import { fetchHealth } from '../lib/api'
 import { relativeTime } from '../lib/utils'
 
 const NAV = [
-  { to: '/',           icon: LayoutDashboard, label: 'Command Center' },
-  { to: '/signals',    icon: Radio,           label: 'Signals Feed' },
-  { to: '/alerts',     icon: Bell,            label: 'Alerts' },
-  { to: '/sources',    icon: Database,        label: 'Sources' },
-  { to: '/analytics',  icon: BarChart3,       label: 'Analytics' },
-  { to: '/simulator',  icon: TrendingUp,      label: 'Trader Simulator' },
+  { to: '/',          icon: LayoutDashboard, label: 'COMMAND CTR' },
+  { to: '/signals',   icon: Radio,           label: 'SIGNALS' },
+  { to: '/alerts',    icon: Bell,            label: 'ALERTS' },
+  { to: '/sources',   icon: Database,        label: 'SOURCES' },
+  { to: '/analytics', icon: BarChart3,       label: 'ANALYTICS' },
+  { to: '/simulator', icon: TrendingUp,      label: 'SIMULATOR' },
 ]
 
 export default function Sidebar({ countdown }) {
@@ -33,96 +33,149 @@ export default function Sidebar({ countdown }) {
     return () => clearInterval(t)
   }, [])
 
-  const w = sidebarCollapsed ? 'w-16' : 'w-64'
+  const w = sidebarCollapsed ? 'w-12' : 'w-52'
 
   return (
-    <aside className={`${w} shrink-0 flex flex-col bg-[#111827] border-r border-[#1e2d45] transition-all duration-300 ease-in-out relative`}>
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-[#1e2d45]">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-purple-600 flex items-center justify-center shrink-0">
-          <Zap size={16} className="text-white" />
+    <aside
+      className={`${w} shrink-0 flex flex-col transition-all duration-150`}
+      style={{
+        background: '#0d0d0d',
+        borderRight: '1px solid #2a2a2a',
+      }}
+    >
+      {/* ── Logo ── */}
+      <div
+        className="flex items-center gap-2 px-3 py-3"
+        style={{ borderBottom: '1px solid #2a2a2a' }}
+      >
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{ width: 22, height: 22, background: '#00FF41', color: '#000' }}
+        >
+          <Zap size={13} />
         </div>
         {!sidebarCollapsed && (
           <div>
-            <p className="font-bold text-white tracking-wider text-sm">GHOST<span className="text-red-400">GRID</span></p>
-            <p className="text-[10px] text-slate-500 tracking-widest uppercase">Crisis Monitor</p>
+            <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 12, fontWeight: 700, color: '#00FF41', letterSpacing: '0.12em' }}>
+              GHOST<span style={{ color: '#e0e0e0' }}>GRID</span>
+            </p>
+            <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', letterSpacing: '0.1em', marginTop: 1 }}>
+              CRISIS/MONITOR v3.0
+            </p>
           </div>
         )}
       </div>
 
-      {/* LIVE badge */}
+      {/* ── Status bar ── */}
       {!sidebarCollapsed && (
-        <div className="px-4 py-3 border-b border-[#1e2d45]">
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold tracking-widest
-            ${live ? 'bg-green-500/15 text-green-400 border border-green-500/30' : 'bg-red-500/15 text-red-400 border border-red-500/30'}`}>
-            <span className={`w-2 h-2 rounded-full ${live ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`} />
-            {live ? 'LIVE' : 'OFFLINE'}
-          </div>
+        <div
+          className="flex items-center gap-2 px-3 py-2"
+          style={{ borderBottom: '1px solid #2a2a2a', background: '#080808' }}
+        >
+          <span
+            style={{
+              width: 6, height: 6, flexShrink: 0,
+              background: live ? '#00FF41' : '#E24B4A',
+              animation: live ? 'termBlink 1.4s step-end infinite' : 'none',
+            }}
+          />
+          <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 10, color: live ? '#00FF41' : '#E24B4A', letterSpacing: '0.1em' }}>
+            {live ? 'SYS:ONLINE' : 'SYS:OFFLINE'}
+          </span>
         </div>
       )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
+      {/* ── Navigation ── */}
+      <nav className="flex-1 py-1 overflow-y-auto">
         {NAV.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 group
-              ${isActive
-                ? 'bg-gradient-to-r from-red-500/20 to-purple-500/10 text-white border border-red-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-white/5'}`
-            }
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: sidebarCollapsed ? '7px 0' : '7px 12px',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              fontFamily: 'Fira Code, monospace',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textDecoration: 'none',
+              borderLeft: isActive ? '2px solid #00FF41' : '2px solid transparent',
+              background: isActive ? 'rgba(0,255,65,0.06)' : 'transparent',
+              color: isActive ? '#00FF41' : '#555555',
+              transition: 'all 0.1s',
+            })}
+            onMouseEnter={e => {
+              if (!e.currentTarget.style.borderLeftColor.includes('00FF41')) {
+                e.currentTarget.style.color = '#aaaaaa'
+                e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
+              }
+            }}
+            onMouseLeave={e => {
+              if (!e.currentTarget.style.borderLeftColor.includes('00FF41')) {
+                e.currentTarget.style.color = '#555555'
+                e.currentTarget.style.background = 'transparent'
+              }
+            }}
           >
-            {({ isActive }) => (
-              <>
-                <Icon size={18} className={isActive ? 'text-red-400' : 'text-slate-500 group-hover:text-slate-300'} />
-                {!sidebarCollapsed && <span className="font-medium">{label}</span>}
-                {!sidebarCollapsed && isActive && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-red-400" />
-                )}
-              </>
-            )}
+            <Icon size={14} />
+            {!sidebarCollapsed && <span>{label}</span>}
           </NavLink>
         ))}
       </nav>
 
-      {/* Source health dots */}
+      {/* ── Sources health ── */}
       {!sidebarCollapsed && (
-        <div className="px-4 py-3 border-t border-[#1e2d45]">
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Sources</p>
-          <div className="flex flex-wrap gap-1.5">
-            {sources.slice(0, 8).map((s, i) => {
+        <div className="px-3 py-2" style={{ borderTop: '1px solid #2a2a2a' }}>
+          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', letterSpacing: '0.1em', marginBottom: 5 }}>
+            SOURCES [{onlineCount}/{sources.length}]
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {sources.slice(0, 10).map((s, i) => {
               const age = s.last_seen ? Date.now() - new Date(s.last_seen).getTime() : Infinity
-              const color = age < 3600000 ? 'bg-green-400' : age < 86400000 ? 'bg-amber-400' : 'bg-red-400'
+              const color = age < 3600000 ? '#00FF41' : age < 86400000 ? '#EF9F27' : '#E24B4A'
               return (
-                <div key={i} title={`${s.source}: ${relativeTime(s.last_seen)}`}
-                  className={`w-2 h-2 rounded-full ${color} animate-pulse`} />
+                <span
+                  key={i}
+                  title={`${s.source}: ${relativeTime(s.last_seen)}`}
+                  style={{ width: 6, height: 6, background: color, display: 'inline-block' }}
+                />
               )
             })}
           </div>
-          <p className="text-[10px] text-slate-500 mt-1.5">
-            {onlineCount} / {sources.length} online
-          </p>
         </div>
       )}
 
-      {/* Footer: countdown */}
-      <div className="px-4 py-3 border-t border-[#1e2d45]">
+      {/* ── Footer / collapse ── */}
+      <div
+        className="flex items-center justify-between px-3 py-2"
+        style={{ borderTop: '1px solid #2a2a2a', background: '#080808' }}
+      >
         {!sidebarCollapsed ? (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-              <Activity size={11} />
-              <span>Refresh in {countdown}s</span>
-            </div>
-            <button onClick={toggleSidebar} className="text-slate-500 hover:text-slate-300 transition-colors">
-              <ChevronLeft size={16} />
+          <>
+            <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#333' }}>
+              SYNC/{countdown}s
+            </span>
+            <button
+              onClick={toggleSidebar}
+              style={{ color: '#444', background: 'none', border: 'none', padding: 2, lineHeight: 0 }}
+              onMouseEnter={e => e.currentTarget.style.color = '#00FF41'}
+              onMouseLeave={e => e.currentTarget.style.color = '#444'}
+            >
+              <ChevronLeft size={13} />
             </button>
-          </div>
+          </>
         ) : (
-          <button onClick={toggleSidebar} className="w-full flex justify-center text-slate-500 hover:text-slate-300 transition-colors">
-            <ChevronRight size={16} />
+          <button
+            onClick={toggleSidebar}
+            style={{ color: '#444', background: 'none', border: 'none', padding: 2, lineHeight: 0, margin: '0 auto' }}
+            onMouseEnter={e => e.currentTarget.style.color = '#00FF41'}
+            onMouseLeave={e => e.currentTarget.style.color = '#444'}
+          >
+            <ChevronRight size={13} />
           </button>
         )}
       </div>

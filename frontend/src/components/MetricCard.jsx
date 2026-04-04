@@ -11,7 +11,7 @@ export default function MetricCard({ icon: Icon, label, value, color = '#378ADD'
     if (isNaN(target)) { setDisplayed(value); return }
     const delta = target - start
     if (delta === 0) return
-    const steps = 30
+    const steps = 20
     let step = 0
     const timer = setInterval(() => {
       step++
@@ -22,22 +22,29 @@ export default function MetricCard({ icon: Icon, label, value, color = '#378ADD'
   }, [value])
 
   return (
-    <div className="card p-5 flex items-start gap-4 relative overflow-hidden group hover:border-white/10 transition-colors">
-      {/* Glow */}
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: `radial-gradient(ellipse at 0% 0%, ${color}15, transparent 60%)` }} />
-
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-        style={{ backgroundColor: `${color}20`, border: `1px solid ${color}30` }}>
-        <Icon size={20} style={{ color }} />
-      </div>
-
-      <div className="relative">
-        <p className="text-slate-400 text-xs uppercase tracking-widest">{label}</p>
-        <p className="text-white text-2xl font-bold font-mono mt-0.5">
+    <div
+      style={{
+        background: '#0d0d0d',
+        border: `1px solid #2a2a2a`,
+        borderLeft: `2px solid ${color}`,
+        padding: '8px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        overflow: 'hidden',
+      }}
+    >
+      <Icon size={16} style={{ color, flexShrink: 0 }} />
+      <div>
+        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+          {label}
+        </p>
+        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 22, fontWeight: 700, color: '#d8d8d8', lineHeight: 1.1, marginTop: 2 }}>
           {typeof value === 'number' ? displayed : value}
         </p>
-        {subtitle && <p className="text-slate-500 text-xs mt-0.5">{subtitle}</p>}
+        {subtitle && (
+          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', marginTop: 2 }}>{subtitle}</p>
+        )}
       </div>
     </div>
   )
