@@ -5,6 +5,7 @@ import SignalsFeed from './pages/SignalsFeed'
 import Alerts from './pages/Alerts'
 import Sources from './pages/Sources'
 import Analytics from './pages/Analytics'
+import TraderSimulator from './components/TraderSimulator'
 
 export default function AppRoutes() {
   return (
@@ -14,7 +15,8 @@ export default function AppRoutes() {
         <Route path="signals"   element={<SignalsFeed />} />
         <Route path="alerts"    element={<Alerts />} />
         <Route path="sources"   element={<Sources />} />
-        <Route path="analytics" element={<Analytics />} />
+        <Route path="analytics"  element={<Analytics />} />
+        <Route path="simulator"  element={<TraderSimulator />} />
       </Route>
     </Routes>
   )

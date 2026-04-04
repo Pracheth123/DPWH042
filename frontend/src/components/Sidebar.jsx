@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Radio, Bell, Database, BarChart3,
-  ChevronLeft, ChevronRight, Activity, Zap
+  ChevronLeft, ChevronRight, Activity, Zap, TrendingUp
 } from 'lucide-react'
 import { useUI } from '../context/UIContext'
 import { useSources } from '../context/SourcesContext'
@@ -10,11 +10,12 @@ import { fetchHealth } from '../lib/api'
 import { relativeTime } from '../lib/utils'
 
 const NAV = [
-  { to: '/',          icon: LayoutDashboard, label: 'Command Center' },
-  { to: '/signals',   icon: Radio,           label: 'Signals Feed' },
-  { to: '/alerts',    icon: Bell,            label: 'Alerts' },
-  { to: '/sources',   icon: Database,        label: 'Sources' },
-  { to: '/analytics', icon: BarChart3,       label: 'Analytics' },
+  { to: '/',           icon: LayoutDashboard, label: 'Command Center' },
+  { to: '/signals',    icon: Radio,           label: 'Signals Feed' },
+  { to: '/alerts',     icon: Bell,            label: 'Alerts' },
+  { to: '/sources',    icon: Database,        label: 'Sources' },
+  { to: '/analytics',  icon: BarChart3,       label: 'Analytics' },
+  { to: '/simulator',  icon: TrendingUp,      label: 'Trader Simulator' },
 ]
 
 export default function Sidebar({ countdown }) {
