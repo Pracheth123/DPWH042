@@ -16,38 +16,30 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/backend/main.py"
+      "source": "/api/(.*)",
+      "destination": "/backend/main.py"
     },
     {
-      "src": "/health",
-      "dest": "/backend/main.py"
+      "source": "/health",
+      "destination": "/backend/main.py"
     },
     {
-      "src": "/docs",
-      "dest": "/backend/main.py"
+      "source": "/docs",
+      "destination": "/backend/main.py"
     },
     {
-      "src": "/redoc",
-      "dest": "/backend/main.py"
+      "source": "/redoc",
+      "destination": "/backend/main.py"
     },
     {
-      "src": "/ws/(.*)",
-      "dest": "/backend/main.py"
+      "source": "/ws/(.*)",
+      "destination": "/backend/main.py"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
-    },
-    {
-      "src": "/([^/]+\\.[a-zA-Z0-9]+)$",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
