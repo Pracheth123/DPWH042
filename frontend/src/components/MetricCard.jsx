@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 
 export default function MetricCard({ icon: Icon, label, value, color = '#378ADD', subtitle }) {
   const [displayed, setDisplayed] = useState(0)
@@ -11,7 +12,7 @@ export default function MetricCard({ icon: Icon, label, value, color = '#378ADD'
     if (isNaN(target)) { setDisplayed(value); return }
     const delta = target - start
     if (delta === 0) return
-    const steps = 20
+    const steps = 30
     let step = 0
     const timer = setInterval(() => {
       step++
@@ -22,30 +23,29 @@ export default function MetricCard({ icon: Icon, label, value, color = '#378ADD'
   }, [value])
 
   return (
-    <div
-      style={{
-        background: '#0d0d0d',
-        border: `1px solid #2a2a2a`,
-        borderLeft: `2px solid ${color}`,
-        padding: '8px 12px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        overflow: 'hidden',
-      }}
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
+      whileHover={{ scale: 1.02, y: -2, transition: { duration: 0.2 } }}
+      className="card p-5 flex items-start gap-4 relative overflow-hidden cursor-default"
     >
-      <Icon size={16} style={{ color, flexShrink: 0 }} />
-      <div>
-        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#555', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-          {label}
-        </p>
-        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 22, fontWeight: 700, color: '#d8d8d8', lineHeight: 1.1, marginTop: 2 }}>
+      {/* Colour-tinted glow on hover */}
+      <div className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity pointer-events-none"
+        style={{ background: `radial-gradient(ellipse at 0% 0%, ${color}12, transparent 60%)` }} />
+
+      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+        style={{ backgroundColor: `${color}18`, border: `1px solid ${color}28` }}>
+        <Icon size={20} style={{ color }} />
+      </div>
+
+      <div className="relative">
+        <p className="text-white/40 text-xs uppercase tracking-widest">{label}</p>
+        <p className="text-white text-2xl font-bold font-mono mt-0.5">
           {typeof value === 'number' ? displayed : value}
         </p>
-        {subtitle && (
-          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', marginTop: 2 }}>{subtitle}</p>
-        )}
+        {subtitle && <p className="text-white/25 text-xs mt-0.5">{subtitle}</p>}
       </div>
-    </div>
+    </motion.div>
   )
 }

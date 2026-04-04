@@ -98,33 +98,27 @@ export default function Analytics() {
     return bins
   }, [inRange])
 
-  const axisStyle = { fill: '#444444', fontSize: 10, fontFamily: 'Fira Code, monospace' }
+  const axisStyle = { fill: '#64748b', fontSize: 11 }
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between" style={{ marginBottom: 12 }}>
+      <div className="flex items-start justify-between">
         <div>
-          <h1 style={{ fontFamily: 'Fira Code, monospace', fontSize: 13, fontWeight: 700, color: '#d8d8d8', letterSpacing: '0.08em' }}>ANALYTICS</h1>
-          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', marginTop: 2 }}>{inRange.length} SIGNALS IN RANGE</p>
+          <h1 className="text-white font-bold text-xl tracking-tight">Analytics</h1>
+          <p className="text-slate-500 text-sm mt-0.5">{inRange.length} signals in range</p>
         </div>
         {/* Range switcher */}
-        <div style={{ display: 'flex', gap: 2, border: '1px solid #2a2a2a', padding: 2, background: '#0d0d0d' }}>
+        <div className="flex gap-1.5 bg-[#1a2235] border border-[#1e2d45] rounded-xl p-1">
           {RANGES.map((r, i) => (
             <button
               key={r.label}
               onClick={() => setRange(i)}
-              style={{
-                padding: '3px 10px',
-                fontFamily: 'Fira Code, monospace',
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                border: 'none',
-                background: range === i ? '#00FF41' : 'transparent',
-                color: range === i ? '#000' : '#555',
-                cursor: 'pointer',
-              }}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                range === i
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
               {r.label}
             </button>

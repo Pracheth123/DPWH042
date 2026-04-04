@@ -13,18 +13,22 @@ function CrisisIndex({ alerts }) {
   const high = alerts.filter(a => a.severity === 'high').length
   const med  = alerts.filter(a => a.severity === 'medium').length
   const idx  = Math.min(10, Math.round((high * 1.5 + med * 0.5) / Math.max(1, alerts.length) * 10))
-  const color = idx >= 7 ? '#E24B4A' : idx >= 4 ? '#EF9F27' : '#00FF41'
+  const color = idx >= 7 ? '#E24B4A' : idx >= 4 ? '#EF9F27' : '#1D9E75'
+  const gradientBg = color.startsWith('#') ? `radial-gradient(circle at 50% 50%, ${color}66, transparent 70%)` : 'none'
 
   return (
-    <div className="card flex flex-col items-center justify-center text-center relative overflow-hidden" style={{ height: 140 }}>
-      <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', letterSpacing: '0.12em', marginBottom: 4 }}>CRISIS INDEX</p>
-      <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 56, fontWeight: 700, color, lineHeight: 1 }}>
+    <div className="card p-6 flex flex-col items-center justify-center text-center h-48 relative overflow-hidden">
+      <div className="absolute inset-0 opacity-20"
+        style={{ background: gradientBg }} />
+      <p className="text-slate-400 text-xs uppercase tracking-widest mb-2">Crisis Index</p>
+      <p className="font-bold font-mono text-7xl" style={{ color, textShadow: `0 0 40px ${color}80` }}>
         {idx}
       </p>
-      <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', marginTop: 2 }}>/ 10</p>
-      <div style={{ display: 'flex', gap: 2, marginTop: 8 }}>
+      <p className="text-slate-500 text-xs mt-2">/ 10</p>
+      <div className="mt-3 flex gap-1">
         {Array.from({ length: 10 }, (_, i) => (
-          <div key={i} style={{ width: 5, height: 10, background: i < idx ? color : '#1a1a1a', border: `1px solid ${i < idx ? color : '#222'}` }} />
+          <div key={i} className="w-1.5 h-3 rounded-sm"
+            style={{ backgroundColor: i < idx ? color : 'rgba(255,255,255,0.08)' }} />
         ))}
       </div>
     </div>
@@ -125,21 +129,21 @@ export default function CommandCenter() {
   const highCount = alerts.filter(a => a.severity === 'high').length
 
   return (
-    <div className="h-full flex flex-col p-3 gap-3 min-h-0">
+    <div className="h-full flex flex-col p-6 gap-6 min-h-0">
       {/* Top bar */}
-      <div className="flex items-center justify-between shrink-0">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ fontFamily: 'Fira Code, monospace', fontSize: 13, fontWeight: 700, color: '#d8d8d8', letterSpacing: '0.08em' }}>COMMAND CENTER</h1>
-          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', marginTop: 2 }}>REAL-TIME SUPPLY CHAIN CRISIS MONITOR</p>
+          <h1 className="text-white font-bold text-xl tracking-tight">Command Center</h1>
+          <p className="text-slate-500 text-sm mt-0.5">Real-time supply chain crisis monitoring</p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#00FF41' }}>
-          <span style={{ width: 5, height: 5, background: '#00FF41', animation: 'termBlink 1.4s step-end infinite' }} />
-          LIVE
+        <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          <span>LIVE</span>
         </div>
       </div>
 
       {/* Metric cards */}
-      <div className="grid grid-cols-3 gap-2 shrink-0">
+      <div className="grid grid-cols-3 gap-4 shrink-0">
         <MetricCard icon={Radio}         label="Total Signals"  value={alerts.length}  color="#378ADD" subtitle="past 72h" />
         <MetricCard icon={AlertTriangle} label="High Alerts"    value={highCount}       color="#E24B4A" subtitle="active" />
         <MetricCard icon={Database}      label="Sources Online" value={onlineCount}     color="#1D9E75" subtitle={`/ ${sources.length} total`} />

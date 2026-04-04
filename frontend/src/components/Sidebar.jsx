@@ -10,12 +10,12 @@ import { fetchHealth } from '../lib/api'
 import { relativeTime } from '../lib/utils'
 
 const NAV = [
-  { to: '/',          icon: LayoutDashboard, label: 'COMMAND CTR' },
-  { to: '/signals',   icon: Radio,           label: 'SIGNALS' },
-  { to: '/alerts',    icon: Bell,            label: 'ALERTS' },
-  { to: '/sources',   icon: Database,        label: 'SOURCES' },
-  { to: '/analytics', icon: BarChart3,       label: 'ANALYTICS' },
-  { to: '/simulator', icon: TrendingUp,      label: 'SIMULATOR' },
+  { to: '/',           icon: LayoutDashboard, label: 'Command Center' },
+  { to: '/signals',    icon: Radio,           label: 'Signals Feed' },
+  { to: '/alerts',     icon: Bell,            label: 'Alerts' },
+  { to: '/sources',    icon: Database,        label: 'Sources' },
+  { to: '/analytics',  icon: BarChart3,       label: 'Analytics' },
+  { to: '/simulator',  icon: TrendingUp,      label: 'Trader Simulator' },
 ]
 
 export default function Sidebar({ countdown }) {
@@ -33,149 +33,99 @@ export default function Sidebar({ countdown }) {
     return () => clearInterval(t)
   }, [])
 
-  const w = sidebarCollapsed ? 'w-12' : 'w-52'
+  const w = sidebarCollapsed ? 'w-16' : 'w-64'
 
   return (
-    <aside
-      className={`${w} shrink-0 flex flex-col transition-all duration-150`}
-      style={{
-        background: '#0d0d0d',
-        borderRight: '1px solid #2a2a2a',
-      }}
-    >
-      {/* ── Logo ── */}
-      <div
-        className="flex items-center gap-2 px-3 py-3"
-        style={{ borderBottom: '1px solid #2a2a2a' }}
-      >
-        <div
-          className="flex items-center justify-center shrink-0"
-          style={{ width: 22, height: 22, background: '#00FF41', color: '#000' }}
-        >
-          <Zap size={13} />
+    <aside className={`${w} shrink-0 flex flex-col glass-panel transition-all duration-300 ease-in-out relative`}
+      style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-4 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-red-500/80 to-purple-600/80 flex items-center justify-center shrink-0 shadow-lg">
+          <Zap size={16} className="text-white" />
         </div>
         {!sidebarCollapsed && (
           <div>
-            <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 12, fontWeight: 700, color: '#00FF41', letterSpacing: '0.12em' }}>
-              GHOST<span style={{ color: '#e0e0e0' }}>GRID</span>
-            </p>
-            <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', letterSpacing: '0.1em', marginTop: 1 }}>
-              CRISIS/MONITOR v3.0
-            </p>
+            <p className="font-bold text-white tracking-wider text-sm">GHOST<span className="text-red-400">GRID</span></p>
+            <p className="text-[10px] text-white/30 tracking-widest uppercase">Crisis Monitor</p>
           </div>
         )}
       </div>
 
-      {/* ── Status bar ── */}
+      {/* LIVE badge */}
       {!sidebarCollapsed && (
-        <div
-          className="flex items-center gap-2 px-3 py-2"
-          style={{ borderBottom: '1px solid #2a2a2a', background: '#080808' }}
-        >
-          <span
-            style={{
-              width: 6, height: 6, flexShrink: 0,
-              background: live ? '#00FF41' : '#E24B4A',
-              animation: live ? 'termBlink 1.4s step-end infinite' : 'none',
-            }}
-          />
-          <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 10, color: live ? '#00FF41' : '#E24B4A', letterSpacing: '0.1em' }}>
-            {live ? 'SYS:ONLINE' : 'SYS:OFFLINE'}
-          </span>
+        <div className="px-4 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono font-bold tracking-widest
+            ${live
+              ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+              : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+            <span className={live ? 'live-dot' : 'w-2 h-2 rounded-full bg-red-400'} />
+            {live ? 'LIVE' : 'OFFLINE'}
+          </div>
         </div>
       )}
 
-      {/* ── Navigation ── */}
-      <nav className="flex-1 py-1 overflow-y-auto">
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
         {NAV.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: sidebarCollapsed ? '7px 0' : '7px 12px',
-              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-              fontFamily: 'Fira Code, monospace',
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.08em',
-              textDecoration: 'none',
-              borderLeft: isActive ? '2px solid #00FF41' : '2px solid transparent',
-              background: isActive ? 'rgba(0,255,65,0.06)' : 'transparent',
-              color: isActive ? '#00FF41' : '#555555',
-              transition: 'all 0.1s',
-            })}
-            onMouseEnter={e => {
-              if (!e.currentTarget.style.borderLeftColor.includes('00FF41')) {
-                e.currentTarget.style.color = '#aaaaaa'
-                e.currentTarget.style.background = 'rgba(255,255,255,0.03)'
-              }
-            }}
-            onMouseLeave={e => {
-              if (!e.currentTarget.style.borderLeftColor.includes('00FF41')) {
-                e.currentTarget.style.color = '#555555'
-                e.currentTarget.style.background = 'transparent'
-              }
-            }}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group
+              ${isActive
+                ? 'bg-white/8 text-white border border-white/10 shadow-sm'
+                : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`
+            }
           >
-            <Icon size={14} />
-            {!sidebarCollapsed && <span>{label}</span>}
+            {({ isActive }) => (
+              <>
+                <Icon size={17} className={isActive ? 'text-red-400' : 'text-white/30 group-hover:text-white/60'} />
+                {!sidebarCollapsed && <span className="font-medium text-[13px]">{label}</span>}
+                {!sidebarCollapsed && isActive && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-red-400/80" />
+                )}
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
 
-      {/* ── Sources health ── */}
+      {/* Source health dots */}
       {!sidebarCollapsed && (
-        <div className="px-3 py-2" style={{ borderTop: '1px solid #2a2a2a' }}>
-          <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#444', letterSpacing: '0.1em', marginBottom: 5 }}>
-            SOURCES [{onlineCount}/{sources.length}]
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {sources.slice(0, 10).map((s, i) => {
+        <div className="px-4 py-3 border-t border-[#1e2d45]">
+          <p className="text-[10px] text-slate-500 uppercase tracking-widest mb-2">Sources</p>
+          <div className="flex flex-wrap gap-1.5">
+            {sources.slice(0, 8).map((s, i) => {
               const age = s.last_seen ? Date.now() - new Date(s.last_seen).getTime() : Infinity
-              const color = age < 3600000 ? '#00FF41' : age < 86400000 ? '#EF9F27' : '#E24B4A'
+              const color = age < 3600000 ? 'bg-green-400' : age < 86400000 ? 'bg-amber-400' : 'bg-red-400'
               return (
-                <span
-                  key={i}
-                  title={`${s.source}: ${relativeTime(s.last_seen)}`}
-                  style={{ width: 6, height: 6, background: color, display: 'inline-block' }}
-                />
+                <div key={i} title={`${s.source}: ${relativeTime(s.last_seen)}`}
+                  className={`w-2 h-2 rounded-full ${color} animate-pulse`} />
               )
             })}
           </div>
+          <p className="text-[10px] text-slate-500 mt-1.5">
+            {onlineCount} / {sources.length} online
+          </p>
         </div>
       )}
 
-      {/* ── Footer / collapse ── */}
-      <div
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderTop: '1px solid #2a2a2a', background: '#080808' }}
-      >
+      {/* Footer: countdown */}
+      <div className="px-4 py-3 border-t border-[#1e2d45]">
         {!sidebarCollapsed ? (
-          <>
-            <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 9, color: '#333' }}>
-              SYNC/{countdown}s
-            </span>
-            <button
-              onClick={toggleSidebar}
-              style={{ color: '#444', background: 'none', border: 'none', padding: 2, lineHeight: 0 }}
-              onMouseEnter={e => e.currentTarget.style.color = '#00FF41'}
-              onMouseLeave={e => e.currentTarget.style.color = '#444'}
-            >
-              <ChevronLeft size={13} />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+              <Activity size={11} />
+              <span>Refresh in {countdown}s</span>
+            </div>
+            <button onClick={toggleSidebar} className="text-slate-500 hover:text-slate-300 transition-colors">
+              <ChevronLeft size={16} />
             </button>
-          </>
+          </div>
         ) : (
-          <button
-            onClick={toggleSidebar}
-            style={{ color: '#444', background: 'none', border: 'none', padding: 2, lineHeight: 0, margin: '0 auto' }}
-            onMouseEnter={e => e.currentTarget.style.color = '#00FF41'}
-            onMouseLeave={e => e.currentTarget.style.color = '#444'}
-          >
-            <ChevronRight size={13} />
+          <button onClick={toggleSidebar} className="w-full flex justify-center text-slate-500 hover:text-slate-300 transition-colors">
+            <ChevronRight size={16} />
           </button>
         )}
       </div>

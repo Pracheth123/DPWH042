@@ -50,10 +50,10 @@ export default function Layout() {
   }, [])
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#000000' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: '#050810' }}>
       <Sidebar countdown={countdown} />
 
-      <main className="flex-1 overflow-hidden relative" style={{ background: '#000000' }}>
+      <main className="flex-1 overflow-y-auto relative">
         <Outlet />
       </main>
 
@@ -62,7 +62,7 @@ export default function Layout() {
       )}
 
       {/* Toast container */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-1 max-w-sm">
+      <div className="fixed bottom-6 right-6 z-50 space-y-2 max-w-sm">
         {toasts.map(t => (
           <Toast key={t.id} toast={t} onDismiss={() => removeToast(t.id)} />
         ))}
